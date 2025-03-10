@@ -31,11 +31,11 @@ os.makedirs(EDITED_VIDEOS_DIR, exist_ok=True) # Create edited-videos directory
 subtitle_offset = 0            # Adjust subtitle start times if needed.
 max_subtitle_duration = 60       # Maximum duration per subtitle clip
 
-subtitle_font = "DilleniaUPC-Bold"   # Ensure this font is installed
-subtitle_fontsize = 48
+subtitle_font = "Calibri-Bold"   # Ensure this font is installed
+subtitle_fontsize = 70 # Increased fontsize for better visibility
 subtitle_color = "white"
-subtitle_stroke_width = subtitle_fontsize / 10
-subtitle_stroke_color = "white"
+subtitle_stroke_width = 4 # Increased stroke width for bolder text
+subtitle_stroke_color = "black" # Changed stroke color to black for better contrast
 subtitle_position = ('center', 'bottom')
 
 # --- Helper Functions ---
@@ -271,7 +271,7 @@ def create_shorts(video_path, subtitle_groups, video_id):
     new_h = int(h * scaling_factor)
     print(f"Original size: ({w}, {h}), New size: ({new_w}, {new_h})")
 
-    # Apply monkey-patch for Pillow compatibility (fixes 'ANTIALIAS' error)
+    # Apply monkey-patch for Pillow compatibility
     import PIL.Image
     if not hasattr(PIL.Image, 'ANTIALIAS'):
         PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
@@ -288,10 +288,8 @@ def create_shorts(video_path, subtitle_groups, video_id):
     # Step 2: Create a white background clip for YouTube Shorts dimensions
     background = ColorClip(size=(target_width, target_height), color=(255, 255, 255)).set_duration(video.duration)
 
-    # Step 3: Create subtitle clips with black background
+    # Step 3: Create subtitle clips with bold font and improved clarity
     subtitle_clips = []
-    subtitle_fontsize = 40  # Reduced from 48 to make subtitles smaller
-    padding = 20  # Padding around text for the black box
     margin = 20   # Margin from the bottom of the video content
 
     for group in subtitle_groups:
@@ -299,33 +297,30 @@ def create_shorts(video_path, subtitle_groups, video_id):
         if duration <= 0:
             continue  # Skip invalid timings
 
-        # Create the text clip
+        # Create the text clip with bold font and high-quality rendering
         tc = TextClip(
             group["text"],
-            font=subtitle_font,
+            font= subtitle_font ,  # "C:/Users/Pavan/Documents/git/fonts/upcdb.ttf" subtitle_font
             fontsize=subtitle_fontsize,
-            color=subtitle_color,
-            stroke_width=subtitle_stroke_width,
-            stroke_color=subtitle_stroke_color,
-            align='center'
+            color=subtitle_color,            # White text
+            stroke_color=subtitle_stroke_color,           # Black outline
+            stroke_width=subtitle_stroke_width,              # Slightly thicker outline for clarity
+            align='center',
+            method='caption',
+            size=(new_w - 40, None),       # Width for text wrapping
+            kerning=-0.5,                  # Adjust letter spacing for better readability
         )
 
-        # Create a black background box slightly larger than the text
-        bg = ColorClip(size=(tc.w + 2 * padding, tc.h + 2 * padding), color=(0, 0, 0))
-
-        # Composite text on the black background, centered
-        tc_on_bg = CompositeVideoClip([bg, tc.set_position('center')], size=bg.size)
-
         # Set timing for the subtitle clip
-        tc_on_bg = tc_on_bg.set_start(group["start"]).set_duration(duration)
+        tc = tc.set_start(group["start"]).set_duration(duration)
 
         # Position the subtitle at the bottom of the resized video content
-        pos_y = new_h - tc_on_bg.h - margin
+        pos_y = new_h - tc.h - margin
         if pos_y < 0:
             pos_y = 0  # Ensure it stays within bounds
-        tc_on_bg = tc_on_bg.set_position(('center', pos_y))
+        tc = tc.set_position(('center', pos_y))
 
-        subtitle_clips.append(tc_on_bg)
+        subtitle_clips.append(tc)
 
     # Step 4: Composite the resized video with subtitles
     composite_video = CompositeVideoClip([video_resized] + subtitle_clips)
@@ -334,10 +329,18 @@ def create_shorts(video_path, subtitle_groups, video_id):
     position = ((target_width - new_w) / 2, (target_height - new_h) / 2)
     final_clip = CompositeVideoClip([background, composite_video.set_position(position)], size=(target_width, target_height))
 
-    # Step 6: Write the output video
+    # Step 6: Write the output video with higher quality settings
     output_file = os.path.join(EDITED_VIDEOS_DIR, f"{video_id}_edited.mp4")
     try:
-        final_clip.write_videofile(output_file, codec="libx264", audio_codec="aac", threads=4)
+        final_clip.write_videofile(
+            output_file,
+            codec="libx264",
+            audio_codec="aac",
+            threads=4,
+            bitrate="8000k",              # Increase bitrate for better quality
+            preset="veryslow",            # Slower encoding for higher quality
+            ffmpeg_params=["-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"]
+        )
         print(f"Video saved to: {output_file}")
     except Exception as e:
         print(f"Error writing video file {output_file}: {e}")
@@ -394,6 +397,6 @@ def main(youtube_url, use_gemini=False, cookies_file=COOKIES_FILE):
     print("Created video with dynamic subtitles based on word-level timestamps.")
 
 if __name__ == "__main__":
-    youtube_url = input("Enter YouTube video URL: ")  # e.g., https://www.youtube.com/watch?v=6zkL91LzCMc https://www.youtube.com/watch?v=usrl2FUWhEE
+    youtube_url = input("Enter YouTube video URL: ")  # e.g., https://www.youtube.com/watch?v=6zkL91LzCMc https://www.youtube.com/watch?v=usrl2FUWhEE https://www.youtube.com/watch?v=R92K3Z3TOe0 https://www.youtube.com/watch?v=GjOEcoMy2fI
     use_gemini = False  # No Gemini API Key needed.
     main(youtube_url, use_gemini=use_gemini)
