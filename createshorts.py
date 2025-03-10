@@ -2,7 +2,7 @@ import os
 import yt_dlp
 from faster_whisper import WhisperModel
 import moviepy
-from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip
+from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, ColorClip
 from moviepy.config import change_settings
 import re
 import requests
@@ -19,11 +19,13 @@ change_settings({"IMAGEMAGICK_BINARY": r"C:\Program Files\ImageMagick-7.1.1-Q16-
 TRANSCRIPT_DIR = "transcripts"
 VIDEOS_DIR = "videos"
 AUDIO_DIR = "audio"
+EDITED_VIDEOS_DIR = "edited-videos"  # New directory for edited videos
 COOKIES_FILE = "cookies.txt"  # Place cookies.txt in same directory as this script
 
 os.makedirs(TRANSCRIPT_DIR, exist_ok=True)
 os.makedirs(VIDEOS_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
+os.makedirs(EDITED_VIDEOS_DIR, exist_ok=True) # Create edited-videos directory
 
 # --- Subtitle Settings ---
 subtitle_offset = 0            # Adjust subtitle start times if needed.
@@ -148,7 +150,7 @@ def transcribe_audio(video_path, video_id):
     model = WhisperModel("base", device="cpu", compute_type="int8")
     # Request word-level timestamps
     segments, info = model.transcribe(audio_path, beam_size=5, word_timestamps=True)
-    
+
     transcript = []
     try:
         duration_command = [
@@ -163,7 +165,7 @@ def transcribe_audio(video_path, video_id):
     except (subprocess.CalledProcessError, ValueError) as e:
         print(f"Error getting video duration: {e}")
         return []
-    
+
     with tqdm(total=total_duration, desc="Transcribing", unit="s") as pbar:
         for seg in segments:
             transcript.append(seg)
@@ -244,19 +246,60 @@ def group_words_with_timestamps(segments, group_size=3):
                     subtitle_groups.append({"start": start, "end": end, "text": " ".join(group_words)})
     return subtitle_groups
 
-def create_shorts(video_path, subtitle_groups):
+def create_shorts(video_path, subtitle_groups, video_id):
     try:
+        # Load the original video
         video = VideoFileClip(video_path)
+        print(f"Video loaded. Size: {video.size}, Duration: {video.duration}")
     except Exception as e:
         print(f"Error opening video file: {e}")
         return
 
-    # Create text clips for each subtitle group based on their actual timestamps
-    text_clips = []
+    # Test reading a frame
+    try:
+        frame = video.get_frame(0)
+        print(f"Successfully read frame at t=0. Shape: {frame.shape}")
+    except Exception as e:
+        print(f"Error reading frame: {e}")
+        return
+
+    # Step 1: Calculate scaling factor to fit within 1080x1920
+    w, h = video.size
+    target_width, target_height = 1080, 1920
+    scaling_factor = min(target_width / w, target_height / h)
+    new_w = int(w * scaling_factor)
+    new_h = int(h * scaling_factor)
+    print(f"Original size: ({w}, {h}), New size: ({new_w}, {new_h})")
+
+    # Apply monkey-patch for Pillow compatibility (fixes 'ANTIALIAS' error)
+    import PIL.Image
+    if not hasattr(PIL.Image, 'ANTIALIAS'):
+        PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
+        print("Applied Pillow monkey-patch: ANTIALIAS set to LANCZOS")
+
+    # Resize the video while maintaining aspect ratio
+    try:
+        video_resized = video.resize((new_w, new_h))
+        print("Video resized successfully.")
+    except Exception as e:
+        print(f"Error resizing video: {e}")
+        return
+
+    # Step 2: Create a white background clip for YouTube Shorts dimensions
+    background = ColorClip(size=(target_width, target_height), color=(255, 255, 255)).set_duration(video.duration)
+
+    # Step 3: Create subtitle clips with black background
+    subtitle_clips = []
+    subtitle_fontsize = 40  # Reduced from 48 to make subtitles smaller
+    padding = 20  # Padding around text for the black box
+    margin = 20   # Margin from the bottom of the video content
+
     for group in subtitle_groups:
         duration = group["end"] - group["start"]
         if duration <= 0:
             continue  # Skip invalid timings
+
+        # Create the text clip
         tc = TextClip(
             group["text"],
             font=subtitle_font,
@@ -266,19 +309,42 @@ def create_shorts(video_path, subtitle_groups):
             stroke_color=subtitle_stroke_color,
             align='center'
         )
-        tc = tc.set_position(subtitle_position).set_start(group["start"]).set_duration(duration)
-        text_clips.append(tc)
 
-    final_clip = CompositeVideoClip([video] + text_clips)
-    output_file = "output_with_dynamic_subtitles.mp4"
+        # Create a black background box slightly larger than the text
+        bg = ColorClip(size=(tc.w + 2 * padding, tc.h + 2 * padding), color=(0, 0, 0))
+
+        # Composite text on the black background, centered
+        tc_on_bg = CompositeVideoClip([bg, tc.set_position('center')], size=bg.size)
+
+        # Set timing for the subtitle clip
+        tc_on_bg = tc_on_bg.set_start(group["start"]).set_duration(duration)
+
+        # Position the subtitle at the bottom of the resized video content
+        pos_y = new_h - tc_on_bg.h - margin
+        if pos_y < 0:
+            pos_y = 0  # Ensure it stays within bounds
+        tc_on_bg = tc_on_bg.set_position(('center', pos_y))
+
+        subtitle_clips.append(tc_on_bg)
+
+    # Step 4: Composite the resized video with subtitles
+    composite_video = CompositeVideoClip([video_resized] + subtitle_clips)
+
+    # Step 5: Place the composite video centered on the white background
+    position = ((target_width - new_w) / 2, (target_height - new_h) / 2)
+    final_clip = CompositeVideoClip([background, composite_video.set_position(position)], size=(target_width, target_height))
+
+    # Step 6: Write the output video
+    output_file = os.path.join(EDITED_VIDEOS_DIR, f"{video_id}_edited.mp4")
     try:
         final_clip.write_videofile(output_file, codec="libx264", audio_codec="aac", threads=4)
+        print(f"Video saved to: {output_file}")
     except Exception as e:
         print(f"Error writing video file {output_file}: {e}")
     finally:
+        # Clean up
         final_clip.close()
         video.close()
-
 def get_transcript_path(video_id):
     return os.path.join(TRANSCRIPT_DIR, f"{video_id}_transcript.pkl")
 
@@ -315,7 +381,7 @@ def main(youtube_url, use_gemini=False, cookies_file=COOKIES_FILE):
 
     # Group words into subtitle segments with proper timestamps
     subtitle_groups = group_words_with_timestamps(transcript, group_size=3)
-    create_shorts(video_path, subtitle_groups)
+    create_shorts(video_path, subtitle_groups, video_id) # Pass video_id to create_shorts
 
     # Cleanup temporary captions file
     for file in ["captions.srt"]:
