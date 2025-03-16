@@ -1,0 +1,85 @@
+<!-- static/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>YouTube Video Processor</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #videos { margin-top: 20px; }
+        video { max-width: 100%; margin: 10px 0; }
+        #status { color: #555; }
+    </style>
+</head>
+<body>
+    <h1>YouTube Video Processor</h1>
+    <form id="videoForm">
+        <label for="youtube_url">YouTube URL:</label><br>
+        <input type="text" id="youtube_url" name="youtube_url" required style="width: 300px;"><br><br>
+        <label for="shorts_duration">Shorts Duration (seconds):</label><br>
+        <input type="number" id="shorts_duration" name="shorts_duration" value="52" min="1"><br><br>
+        <button type="submit">Process Video</button>
+    </form>
+    <div id="status"></div>
+    <div id="videos"></div>
+
+    <script>
+        document.getElementById('videoForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const url = document.getElementById('youtube_url').value;
+            const duration = parseInt(document.getElementById('shorts_duration').value);
+            document.getElementById('status').textContent = 'Submitting...';
+            document.getElementById('videos').innerHTML = '';
+
+            fetch('/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ youtube_url: url, shorts_duration: duration })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const taskId = data.task_id;
+                document.getElementById('status').textContent = `Processing task ${taskId}...`;
+                checkTaskStatus(taskId);
+            })
+            .catch(error => {
+                document.getElementById('status').textContent = 'Error submitting task.';
+                console.error(error);
+            });
+        });
+
+        function checkTaskStatus(taskId) {
+            fetch(`/tasks/${taskId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'completed') {
+                        document.getElementById('status').textContent = 'Processing complete!';
+                        const editedVideo = document.createElement('video');
+                        editedVideo.src = data.edited_video_url;
+                        editedVideo.controls = true;
+                        editedVideo.poster = ''; // Optional: add thumbnail if available
+                        document.getElementById('videos').appendChild(document.createElement('h3')).textContent = 'Full Video with Subtitles';
+                        document.getElementById('videos').appendChild(editedVideo);
+
+                        document.getElementById('videos').appendChild(document.createElement('h3')).textContent = 'Generated Shorts';
+                        data.shorts_urls.forEach(url => {
+                            const shortVideo = document.createElement('video');
+                            shortVideo.src = url;
+                            shortVideo.controls = true;
+                            document.getElementById('videos').appendChild(shortVideo);
+                        });
+                    } else if (data.status === 'failed') {
+                        document.getElementById('status').textContent = 'Processing failed.';
+                    } else {
+                        document.getElementById('status').textContent = `Processing task ${taskId}...`;
+                        setTimeout(() => checkTaskStatus(taskId), 5000); // Poll every 5 seconds
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('status').textContent = 'Error checking status.';
+                    console.error(error);
+                });
+        }
+    </script>
+</body>
+</html>
