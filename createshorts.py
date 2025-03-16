@@ -1,10 +1,10 @@
 import os
+import re
 import yt_dlp
 from faster_whisper import WhisperModel
 import moviepy
 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, ColorClip
 from moviepy.config import change_settings
-import re
 import requests
 import json
 import shutil
@@ -23,14 +23,17 @@ TRANSCRIPT_DIR = "transcripts"
 VIDEOS_DIR = "videos"
 AUDIO_DIR = "audio"
 EDITED_VIDEOS_DIR = "edited-videos"
+EDITED_SHORTS_DIR = "edited-shorted"  # Folder for short clips
 COOKIES_FILE = "cookies.txt"
+CREATE_SHORTS = True  # Flag to create shorts
 
 os.makedirs(TRANSCRIPT_DIR, exist_ok=True)
 os.makedirs(VIDEOS_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
 os.makedirs(EDITED_VIDEOS_DIR, exist_ok=True)
+os.makedirs(EDITED_SHORTS_DIR, exist_ok=True)
 
-# --- Subtitle Settings ---
+# --- Settings ---
 subtitle_offset = 0
 max_subtitle_duration = 60
 subtitle_font = "Calibri-Bold"
@@ -38,11 +41,16 @@ subtitle_fontsize = 70
 subtitle_color = "white"
 subtitle_stroke_width = 4
 subtitle_stroke_color = "black"
-zoom_factor = 1.5 #Enter zoom factor (e.g., 1.0 for no zoom, 1.2 for 20% zoom)
+zoom_factor = 1.5  # Enter zoom factor (e.g., 1.0 for no zoom, 1.2 for 20% zoom)
 subtitle_vertical_align = 'bottom'  # 'top', 'center', or 'bottom'
 subtitle_vertical_offset = 550  # in pixels, adjusts position from the alignment
+shorts_duration = 52
 
 # --- Helper Functions ---
+def sanitize_filename(name):
+    # Remove characters that are not allowed in file names
+    return re.sub(r'[\\/*?:"<>|]', "", name)
+
 def ensure_ffmpeg_installed():
     if shutil.which("ffmpeg") is not None:
         print("ffmpeg is already installed.")
@@ -84,11 +92,14 @@ def download_video_and_subtitles(url, cookies_file=COOKIES_FILE):
         with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
             info = ydl.extract_info(url, download=False)
             video_id = info.get('id')
+            video_title = info.get('title', 'video')
+            video_title = sanitize_filename(video_title)
     except Exception as e:
         print(f"Error extracting video info: {e}")
-        return False, None, None
+        return False, None, None, None
 
-    video_file = os.path.join(VIDEOS_DIR, f"{video_id}.mp4")
+    video_filename = f"{video_title} - {video_id}.mp4"
+    video_file = os.path.join(VIDEOS_DIR, video_filename)
     if os.path.exists(video_file):
         print(f"Video {video_id} already exists. Reusing existing file.")
         captions_file = video_file.replace('.mp4', '.en.vtt')
@@ -99,7 +110,7 @@ def download_video_and_subtitles(url, cookies_file=COOKIES_FILE):
             has_captions = True
         else:
             has_captions = False
-        return has_captions, video_file, video_id
+        return has_captions, video_file, video_id, video_title
 
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
@@ -115,16 +126,21 @@ def download_video_and_subtitles(url, cookies_file=COOKIES_FILE):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            video_id = info.get('id')
+            video_title = info.get('title', 'video')
+            video_title = sanitize_filename(video_title)
+            video_filename = f"{video_title} - {video_id}.mp4"
+            video_file = os.path.join(VIDEOS_DIR, video_filename)
             subtitle_file = video_file.replace('.mp4', '.en.vtt')
             if not os.path.exists(subtitle_file):
                 subtitle_file = video_file.replace('.mp4', '.en.srt')
             if os.path.exists(subtitle_file):
                 os.rename(subtitle_file, 'captions.srt')
-                return True, video_file, video_id
-            return False, video_file, video_id
+                return True, video_file, video_id, video_title
+            return False, video_file, video_id, video_title
     except Exception as e:
         print(f"Error downloading video with yt-dlp: {e}")
-        return False, None, None
+        return False, None, None, None
 
 # --- Transcription and Subtitle Parsing Functions ---
 def transcribe_audio(video_path, video_id):
@@ -237,7 +253,7 @@ def group_words_with_timestamps(segments, group_size=3):
                     subtitle_groups.append({"start": start, "end": end, "text": " ".join(group_words)})
     return subtitle_groups
 
-def create_shorts(video_path, subtitle_groups, video_id, zoom_factor=1.0):
+def create_shorts(video_path, subtitle_groups, video_id, video_title, zoom_factor=1.0):
     try:
         video = VideoFileClip(video_path)
         print(f"Video loaded. Size: {video.size}, Duration: {video.duration}")
@@ -266,7 +282,6 @@ def create_shorts(video_path, subtitle_groups, video_id, zoom_factor=1.0):
 
     # Step 3: Create subtitle clips
     subtitle_clips = []
-
     for group in subtitle_groups:
         duration = group["end"] - group["start"]
         if duration <= 0:
@@ -284,7 +299,6 @@ def create_shorts(video_path, subtitle_groups, video_id, zoom_factor=1.0):
             size=(target_width - 40, None),
             kerning=-0.5,
         )
-
         tc = tc.set_start(group["start"]).set_duration(duration)
         text_w, text_h = tc.size
 
@@ -298,9 +312,7 @@ def create_shorts(video_path, subtitle_groups, video_id, zoom_factor=1.0):
         else:
             raise ValueError("Invalid subtitle_vertical_align. Must be 'top', 'center', or 'bottom'.")
 
-        # Clamp pos_y to keep subtitles within the video frame
         pos_y = max(0, min(pos_y, target_height - text_h))
-
         tc = tc.set_position(('center', pos_y))
         subtitle_clips.append(tc)
 
@@ -314,8 +326,9 @@ def create_shorts(video_path, subtitle_groups, video_id, zoom_factor=1.0):
         size=(target_width, target_height)
     )
 
-    # Step 6: Write the output video
-    output_file = os.path.join(EDITED_VIDEOS_DIR, f"{video_id}_edited.mp4")
+    # Step 6: Write the output video with naming convention: <video_title> - <video_id>_edited.mp4
+    edited_filename = f"{video_title} - {video_id}_edited.mp4"
+    output_file = os.path.join(EDITED_VIDEOS_DIR, edited_filename)
     try:
         final_clip.write_videofile(
             output_file,
@@ -332,6 +345,33 @@ def create_shorts(video_path, subtitle_groups, video_id, zoom_factor=1.0):
     finally:
         final_clip.close()
         video.close()
+    return output_file  # Return the path of the edited video
+
+def create_video_shorts(edited_video_path, video_id, video_title, segment_duration=shorts_duration):
+    """
+    Chunks the edited video into short segments of 'segment_duration' seconds
+    and saves them in the EDITED_SHORTS_DIR with names like:
+    <video_title> - <video_id>_part1.mp4, etc.
+    """
+    print("Creating video shorts...")
+    # Define output filename pattern
+    output_pattern = os.path.join(EDITED_SHORTS_DIR, f"{video_title} - {video_id}_Part %01d.mp4")
+    cmd = [
+        "ffmpeg",
+        "-i", edited_video_path,
+        "-c", "copy",
+        "-map", "0",
+        "-segment_time", str(segment_duration),
+        "-f", "segment",
+        "-reset_timestamps", "1",
+        output_pattern
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+        print(f"Video shorts created in folder: {EDITED_SHORTS_DIR}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error creating video shorts: {e.stderr}")
+
 def get_transcript_path(video_id):
     return os.path.join(TRANSCRIPT_DIR, f"{video_id}_transcript.pkl")
 
@@ -343,7 +383,7 @@ def main(youtube_url, use_gemini=False, cookies_file=COOKIES_FILE):
         print("Exiting due to ImageMagick installation failure.")
         return
 
-    has_captions, video_path, video_id = download_video_and_subtitles(youtube_url, cookies_file=cookies_file)
+    has_captions, video_path, video_id, video_title = download_video_and_subtitles(youtube_url, cookies_file=cookies_file)
     if video_path is None or video_id is None:
         print("Exiting due to download failure.")
         return
@@ -368,10 +408,21 @@ def main(youtube_url, use_gemini=False, cookies_file=COOKIES_FILE):
 
     subtitle_groups = group_words_with_timestamps(transcript, group_size=3)
 
-    # Get zoom factor from user
-    create_shorts(video_path, subtitle_groups, video_id, zoom_factor)
+    # Define the expected edited video filename and path
+    edited_filename = f"{video_title} - {video_id}_edited.mp4"
+    edited_video_path = os.path.join(EDITED_VIDEOS_DIR, edited_filename)
 
-    # Cleanup
+    # Check if edited video already exists; if so, reuse it
+    if os.path.exists(edited_video_path):
+        print(f"Edited video {video_id} already exists. Reusing existing file.")
+    else:
+        edited_video_path = create_shorts(video_path, subtitle_groups, video_id, video_title, zoom_factor)
+
+    # If the flag is enabled, create shorts from the edited video
+    if CREATE_SHORTS and edited_video_path:
+        create_video_shorts(edited_video_path, video_id, video_title, segment_duration=shorts_duration)
+
+    # Cleanup temporary caption file if exists
     for file in ["captions.srt"]:
         if os.path.exists(file):
             try:
@@ -379,9 +430,9 @@ def main(youtube_url, use_gemini=False, cookies_file=COOKIES_FILE):
             except Exception as e:
                 print(f"Error deleting file {file}: {e}")
 
-    print("Created video with dynamic subtitles and zoom functionality.")
+    print("Processing complete.")
 
 if __name__ == "__main__":
-    youtube_url = input("Enter YouTube video URL: ") #https://www.youtube.com/watch?v=GjOEcoMy2fI
+    youtube_url = input("Enter YouTube video URL: ")  # e.g., https://www.youtube.com/watch?v=PTid4KSwQTs y8wdynZ0iWg
     use_gemini = False
     main(youtube_url, use_gemini=use_gemini)
