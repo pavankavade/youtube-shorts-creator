@@ -1,3 +1,4 @@
+#createshorts.py
 import os
 import re
 import yt_dlp
@@ -19,13 +20,18 @@ if not hasattr(PIL.Image, 'ANTIALIAS'):
 change_settings({"IMAGEMAGICK_BINARY": r"C:\Program Files\ImageMagick-7.1.1-Q16-HDRI\magick.exe"})
 
 # --- Configuration ---
-TRANSCRIPT_DIR = "transcripts"
-VIDEOS_DIR = "videos"
-AUDIO_DIR = "audio"
-EDITED_VIDEOS_DIR = "edited-videos"
-EDITED_SHORTS_DIR = "edited-shorted"  # Folder for short clips
+
+# Directory setup (use absolute paths for robustness)
+DATA_DIR = os.path.abspath("data")
+VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
+AUDIO_DIR = os.path.join(DATA_DIR, "audio")
+EDITED_VIDEOS_DIR = os.path.join(DATA_DIR, "edited-videos")
+EDITED_SHORTS_DIR = os.path.join(DATA_DIR, "edited-shorted")
+TRANSCRIPT_DIR = os.path.join(DATA_DIR, "transcripts")
 COOKIES_FILE = "cookies.txt"
-CREATE_SHORTS = True  # Flag to create shorts
+
+for dir_path in [DATA_DIR, VIDEOS_DIR, AUDIO_DIR, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR, TRANSCRIPT_DIR]:
+    os.makedirs(dir_path, exist_ok=True)
 
 os.makedirs(TRANSCRIPT_DIR, exist_ok=True)
 os.makedirs(VIDEOS_DIR, exist_ok=True)
@@ -45,6 +51,7 @@ zoom_factor = 1.5  # Enter zoom factor (e.g., 1.0 for no zoom, 1.2 for 20% zoom)
 subtitle_vertical_align = 'bottom'  # 'top', 'center', or 'bottom'
 subtitle_vertical_offset = 550  # in pixels, adjusts position from the alignment
 shorts_duration = 52
+CREATE_SHORTS = True  # Flag to create shorts
 
 # --- Helper Functions ---
 def sanitize_filename(name):
@@ -347,90 +354,66 @@ def create_shorts(video_path, subtitle_groups, video_id, video_title, zoom_facto
         video.close()
     return output_file  # Return the path of the edited video
 
-def create_video_shorts(edited_video_path, video_id, video_title, segment_duration=shorts_duration):
-    """
-    Chunks the edited video into short segments of 'segment_duration' seconds
-    and saves them in the EDITED_SHORTS_DIR with names like:
-    <video_title> - <video_id>_part1.mp4, etc.
-    """
+def create_video_shorts(edited_video_path, video_id, video_title, segment_duration=52):
     print("Creating video shorts...")
-    # Define output filename pattern
     output_pattern = os.path.join(EDITED_SHORTS_DIR, f"{video_title} - {video_id}_Part %01d.mp4")
     cmd = [
-        "ffmpeg",
-        "-i", edited_video_path,
-        "-c", "copy",
-        "-map", "0",
-        "-segment_time", str(segment_duration),
-        "-f", "segment",
-        "-reset_timestamps", "1",
-        output_pattern
+        "ffmpeg", "-i", edited_video_path, "-c", "copy", "-map", "0",
+        "-segment_time", str(segment_duration), "-f", "segment",
+        "-reset_timestamps", "1", output_pattern
     ]
     try:
-        subprocess.run(cmd, check=True)
-        print(f"Video shorts created in folder: {EDITED_SHORTS_DIR}")
+        subprocess.run(cmd, check=True, capture_output=True)
+        # List generated shorts
+        shorts_files = [
+            f for f in os.listdir(EDITED_SHORTS_DIR)
+            if f.startswith(f"{video_title} - {video_id}_Part ") and f.endswith(".mp4")
+        ]
+        shorts_paths = [os.path.join(EDITED_SHORTS_DIR, f) for f in shorts_files]
+        print(f"Video shorts created: {shorts_paths}")
+        return shorts_paths
     except subprocess.CalledProcessError as e:
-        print(f"Error creating video shorts: {e.stderr}")
+        print(f"Error creating video shorts: {e.stderr.decode()}")
+        return []
 
 def get_transcript_path(video_id):
     return os.path.join(TRANSCRIPT_DIR, f"{video_id}_transcript.pkl")
 
-def main(youtube_url, use_gemini=False, cookies_file=COOKIES_FILE):
-    if not ensure_ffmpeg_installed():
-        print("Exiting due to ffmpeg installation failure.")
-        return
-    if not ensure_imagemagick_installed():
-        print("Exiting due to ImageMagick installation failure.")
-        return
-
-    has_captions, video_path, video_id, video_title = download_video_and_subtitles(youtube_url, cookies_file=cookies_file)
-    if video_path is None or video_id is None:
-        print("Exiting due to download failure.")
-        return
+def main(youtube_url, shorts_duration=52, cookies_file=COOKIES_FILE):
+    if not ensure_ffmpeg_installed() or not ensure_imagemagick_installed():
+        raise RuntimeError("Required dependencies not installed.")
+    
+    has_captions, video_path, video_id, video_title = download_video_and_subtitles(youtube_url, cookies_file)
+    if not video_path or not video_id:
+        raise ValueError("Video download failed.")
 
     transcript_file = get_transcript_path(video_id)
     if os.path.exists(transcript_file):
-        print(f"Loading existing transcript for video {video_id}...")
         with open(transcript_file, 'rb') as f:
             transcript = pickle.load(f)
     else:
-        if has_captions:
-            transcript = parse_srt('captions.srt')
-        else:
-            transcript = transcribe_audio(video_path, video_id)
+        transcript = parse_srt('captions.srt') if has_captions else transcribe_audio(video_path, video_id)
         if transcript:
             with open(transcript_file, 'wb') as f:
                 pickle.dump(transcript, f)
-            print(f"Transcript saved for video {video_id}")
         else:
-            print("Transcription failed. Exiting.")
-            return
+            raise RuntimeError("Transcription failed.")
 
     subtitle_groups = group_words_with_timestamps(transcript, group_size=3)
-
-    # Define the expected edited video filename and path
     edited_filename = f"{video_title} - {video_id}_edited.mp4"
     edited_video_path = os.path.join(EDITED_VIDEOS_DIR, edited_filename)
 
-    # Check if edited video already exists; if so, reuse it
-    if os.path.exists(edited_video_path):
-        print(f"Edited video {video_id} already exists. Reusing existing file.")
-    else:
-        edited_video_path = create_shorts(video_path, subtitle_groups, video_id, video_title, zoom_factor)
+    if not os.path.exists(edited_video_path):
+        edited_video_path = create_shorts(video_path, subtitle_groups, video_id, video_title, zoom_factor=1.5)
 
-    # If the flag is enabled, create shorts from the edited video
-    if CREATE_SHORTS and edited_video_path:
-        create_video_shorts(edited_video_path, video_id, video_title, segment_duration=shorts_duration)
+    shorts_paths = create_video_shorts(edited_video_path, video_id, video_title, segment_duration=shorts_duration) if shorts_duration > 0 else []
 
-    # Cleanup temporary caption file if exists
+    # Cleanup
     for file in ["captions.srt"]:
         if os.path.exists(file):
-            try:
-                os.remove(file)
-            except Exception as e:
-                print(f"Error deleting file {file}: {e}")
+            os.remove(file)
 
-    print("Processing complete.")
+    return video_id, edited_video_path, shorts_paths
 
 if __name__ == "__main__":
     youtube_url = input("Enter YouTube video URL: ")  # e.g., https://www.youtube.com/watch?v=PTid4KSwQTs y8wdynZ0iWg
