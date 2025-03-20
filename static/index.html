@@ -9,77 +9,224 @@
         #videos { margin-top: 20px; }
         video { max-width: 100%; margin: 10px 0; }
         #status { color: #555; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .progress-container { margin-top: 10px; }
+        .progress-bar { width: 100%; height: 20px; background-color: #f0f0f0; }
+        .progress-fill { height: 100%; background-color: #4CAF50; transition: width 0.5s ease-in-out; }
+        .progress-label { font-size: 14px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
     <h1>YouTube Video Processor</h1>
     <form id="videoForm">
-        <label for="youtube_url">YouTube URL:</label><br>
-        <input type="text" id="youtube_url" name="youtube_url" required style="width: 300px;"><br><br>
-        <label for="shorts_duration">Shorts Duration (seconds):</label><br>
-        <input type="number" id="shorts_duration" name="shorts_duration" value="52" min="1"><br><br>
+        <label for="youtube_url">YouTube URL:</label>
+        <input type="text" id="youtube_url" name="youtube_url" required style="width: 300px;">
+        <label for="shorts_duration">Shorts Duration (seconds):</label>
+        <input type="number" id="shorts_duration" name="shorts_duration" value="52" min="1">
         <button type="submit">Process Video</button>
     </form>
     <div id="status"></div>
+    <div id="progress-container" class="progress-container">
+        <div class="progress-label">Transcription Progress: <span id="transcription-progress-text">0%</span></div>
+        <div class="progress-bar"><div id="transcription-progress" class="progress-fill" style="width: 0%;"></div></div>
+        <div class="progress-label">Rendering Progress: <span id="rendering-progress-text">0%</span></div>
+        <div class="progress-bar"><div id="rendering-progress" class="progress-fill" style="width: 0%;"></div></div>
+        <div class="progress-label">Shorts Creation Progress: <span id="shorts-progress-text">0%</span></div>
+        <div class="progress-bar"><div id="shorts-progress" class="progress-fill" style="width: 0%;"></div></div>
+    </div>
     <div id="videos"></div>
+    <h2>Completed Tasks</h2>
+    <table id="tasksTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Video Name</th>
+                <th>Video URL</th>
+                <th>Complete Video</th>
+                <th>Shorts</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Tasks will be inserted here -->
+        </tbody>
+    </table>
 
-    <script>
-        document.getElementById('videoForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const url = document.getElementById('youtube_url').value;
-            const duration = parseInt(document.getElementById('shorts_duration').value);
-            document.getElementById('status').textContent = 'Submitting...';
-            document.getElementById('videos').innerHTML = '';
+    <!-- Complete Video Modal -->
+    <div id="videoModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000;">
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);">
+            <video id="modalVideo" controls style="max-width:90vw; max-height:90vh;"></video>
+            <button onclick="closeVideoModal()" style="position:absolute; top:10px; right:10px;">Close</button>
+        </div>
+    </div>
 
-            fetch('/tasks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ youtube_url: url, shorts_duration: duration })
+    <!-- Shorts Popup Modal -->
+    <div id="shortsModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000;">
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:20px; max-width:90vw; max-height:90vh; overflow:auto;">
+            <h3>Shorts</h3>
+            <div id="shortsList"></div>
+            <button onclick="closeShortsModal()" style="margin-top:10px;">Close</button>
+        </div>
+    </div>
+
+<script>
+    document.getElementById('videoForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const url = document.getElementById('youtube_url').value;
+        const duration = parseInt(document.getElementById('shorts_duration').value);
+        document.getElementById('status').textContent = 'Submitting...';
+        document.getElementById('videos').innerHTML = '';
+
+        fetch('/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ youtube_url: url, shorts_duration: duration })
+        })
+        .then(response => response.json())
+        .then(data => {
+            const taskId = data.task_id;
+            document.getElementById('status').textContent = `Processing task ${taskId}...`;
+            checkTaskStatus(taskId);
+        })
+        .catch(error => {
+            document.getElementById('status').textContent = 'Error submitting task.';
+            console.error(error);
+        });
+    });
+
+    function checkTaskStatus(taskId) {
+    fetch(`/tasks/${taskId}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Task status:', data); // Debug log to verify response
+            if (data.status === 'completed') {
+                document.getElementById('status').textContent = 'Processing complete!';
+                updateProgressBars(100, 100, 100);
+                const editedVideo = document.createElement('video');
+                editedVideo.src = data.edited_video_url;
+                editedVideo.controls = true;
+                document.getElementById('videos').appendChild(document.createElement('h3')).textContent = 'Full Video with Subtitles';
+                document.getElementById('videos').appendChild(editedVideo);
+
+                document.getElementById('videos').appendChild(document.createElement('h3')).textContent = 'Generated Shorts';
+                data.shorts_urls.forEach(url => {
+                    const shortVideo = document.createElement('video');
+                    shortVideo.src = url;
+                    shortVideo.controls = true;
+                    document.getElementById('videos').appendChild(shortVideo);
+                });
+            } else if (data.status === 'failed') {
+                document.getElementById('status').textContent = 'Processing failed.';
+                updateProgressBars(0, 0, 0);
+            } else {
+                document.getElementById('status').textContent = `Processing task ${taskId}...`;
+                updateProgressBars(
+                    data.progress.transcription,
+                    data.progress.rendering,
+                    data.progress.shorts
+                );
+                setTimeout(() => checkTaskStatus(taskId), 1000); // Poll every 1 second
+            }
+        })
+        .catch(error => {
+            document.getElementById('status').textContent = 'Error checking status.';
+            console.error(error);
+        });
+}
+
+    function updateProgressBars(transcription, rendering, shorts) {
+        document.getElementById('transcription-progress').style.width = `${transcription}%`;
+        document.getElementById('transcription-progress-text').textContent = `${transcription.toFixed(2)}%`;
+        document.getElementById('rendering-progress').style.width = `${rendering}%`;
+        document.getElementById('rendering-progress-text').textContent = `${rendering.toFixed(2)}%`;
+        document.getElementById('shorts-progress').style.width = `${shorts}%`;
+        document.getElementById('shorts-progress-text').textContent = `${shorts.toFixed(2)}%`;
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/tasks')
+            .then(response => response.json())
+            .then(tasks => {
+                const tableBody = document.querySelector('#tasksTable tbody');
+                tableBody.innerHTML = '';
+                tasks.forEach(task => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${task.id}</td>
+                        <td>${task.video_title}</td>
+                        <td><a href="${task.youtube_url}" target="_blank">${task.youtube_url}</a></td>
+                        <td><button onclick="openVideoModal('${task.edited_video_url}')">Play</button></td>
+                        <td><button onclick="openShortsPopup(${task.id})">View Shorts</button></td>
+                        <td><button onclick="deleteTask(${task.id})">Delete</button></td>
+                    `;
+                    tableBody.appendChild(row);
+                });
             })
+            .catch(error => console.error('Error fetching tasks:', error));
+    });
+
+    function openVideoModal(videoUrl) {
+        console.log('Opening video with URL:', videoUrl);
+        const modal = document.getElementById('videoModal');
+        const video = document.getElementById('modalVideo');
+        video.src = videoUrl;
+        video.onerror = () => console.error('Video failed to load:', videoUrl);
+        video.onloadeddata = () => console.log('Video loaded successfully');
+        modal.style.display = 'block';
+    }
+
+    function closeVideoModal() {
+        const modal = document.getElementById('videoModal');
+        const video = document.getElementById('modalVideo');
+        video.pause();
+        video.src = '';
+        modal.style.display = 'none';
+    }
+
+    function openShortsPopup(taskId) {
+        fetch(`/tasks/${taskId}`)
             .then(response => response.json())
             .then(data => {
-                const taskId = data.task_id;
-                document.getElementById('status').textContent = `Processing task ${taskId}...`;
-                checkTaskStatus(taskId);
+                if (data.status === 'completed') {
+                    const shortsList = document.getElementById('shortsList');
+                    shortsList.innerHTML = '';
+                    data.shorts_urls.forEach(url => {
+                        const videoElem = document.createElement('video');
+                        videoElem.src = url;
+                        videoElem.controls = true;
+                        videoElem.style.maxWidth = '100%';
+                        videoElem.style.marginBottom = '10px';
+                        shortsList.appendChild(videoElem);
+                    });
+                    document.getElementById('shortsModal').style.display = 'block';
+                } else {
+                    alert('Task is not completed yet.');
+                }
             })
-            .catch(error => {
-                document.getElementById('status').textContent = 'Error submitting task.';
-                console.error(error);
-            });
-        });
+            .catch(error => console.error('Error fetching task:', error));
+    }
 
-        function checkTaskStatus(taskId) {
-            fetch(`/tasks/${taskId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'completed') {
-                        document.getElementById('status').textContent = 'Processing complete!';
-                        const editedVideo = document.createElement('video');
-                        editedVideo.src = data.edited_video_url;
-                        editedVideo.controls = true;
-                        editedVideo.poster = ''; // Optional: add thumbnail if available
-                        document.getElementById('videos').appendChild(document.createElement('h3')).textContent = 'Full Video with Subtitles';
-                        document.getElementById('videos').appendChild(editedVideo);
+    function closeShortsModal() {
+        document.getElementById('shortsModal').style.display = 'none';
+    }
 
-                        document.getElementById('videos').appendChild(document.createElement('h3')).textContent = 'Generated Shorts';
-                        data.shorts_urls.forEach(url => {
-                            const shortVideo = document.createElement('video');
-                            shortVideo.src = url;
-                            shortVideo.controls = true;
-                            document.getElementById('videos').appendChild(shortVideo);
-                        });
-                    } else if (data.status === 'failed') {
-                        document.getElementById('status').textContent = 'Processing failed.';
-                    } else {
-                        document.getElementById('status').textContent = `Processing task ${taskId}...`;
-                        setTimeout(() => checkTaskStatus(taskId), 5000); // Poll every 5 seconds
-                    }
-                })
-                .catch(error => {
-                    document.getElementById('status').textContent = 'Error checking status.';
-                    console.error(error);
-                });
+    function deleteTask(taskId) {
+        if (confirm('Are you sure you want to delete this task and its files?')) {
+            fetch(`/tasks/${taskId}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Task deleted successfully.');
+                    location.reload();
+                } else {
+                    alert('Failed to delete task.');
+                }
+            })
+            .catch(error => console.error('Error deleting task:', error));
         }
-    </script>
+    }
+</script>
 </body>
 </html>

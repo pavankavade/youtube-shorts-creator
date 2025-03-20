@@ -1,4 +1,4 @@
-#createshorts.py
+# createshorts.py
 import os
 import re
 import yt_dlp
@@ -20,8 +20,6 @@ if not hasattr(PIL.Image, 'ANTIALIAS'):
 change_settings({"IMAGEMAGICK_BINARY": r"C:\Program Files\ImageMagick-7.1.1-Q16-HDRI\magick.exe"})
 
 # --- Configuration ---
-
-# Directory setup (use absolute paths for robustness)
 DATA_DIR = os.path.abspath("data")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 AUDIO_DIR = os.path.join(DATA_DIR, "audio")
@@ -33,12 +31,6 @@ COOKIES_FILE = "cookies.txt"
 for dir_path in [DATA_DIR, VIDEOS_DIR, AUDIO_DIR, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR, TRANSCRIPT_DIR]:
     os.makedirs(dir_path, exist_ok=True)
 
-os.makedirs(TRANSCRIPT_DIR, exist_ok=True)
-os.makedirs(VIDEOS_DIR, exist_ok=True)
-os.makedirs(AUDIO_DIR, exist_ok=True)
-os.makedirs(EDITED_VIDEOS_DIR, exist_ok=True)
-os.makedirs(EDITED_SHORTS_DIR, exist_ok=True)
-
 # --- Settings ---
 subtitle_offset = 0
 max_subtitle_duration = 60
@@ -47,15 +39,14 @@ subtitle_fontsize = 70
 subtitle_color = "white"
 subtitle_stroke_width = 4
 subtitle_stroke_color = "black"
-zoom_factor = 1.5  # Enter zoom factor (e.g., 1.0 for no zoom, 1.2 for 20% zoom)
-subtitle_vertical_align = 'bottom'  # 'top', 'center', or 'bottom'
-subtitle_vertical_offset = 550  # in pixels, adjusts position from the alignment
+zoom_factor = 1.5
+subtitle_vertical_align = 'bottom'
+subtitle_vertical_offset = 550
 shorts_duration = 52
-CREATE_SHORTS = True  # Flag to create shorts
+CREATE_SHORTS = True
 
 # --- Helper Functions ---
 def sanitize_filename(name):
-    # Remove characters that are not allowed in file names
     return re.sub(r'[\\/*?:"<>|]', "", name)
 
 def ensure_ffmpeg_installed():
@@ -92,8 +83,8 @@ def time_to_seconds(time_str):
     h, m, s = map(float, time_str.split(':'))
     return h * 3600 + m * 60 + s
 
-# --- Download Video and Subtitles ---
-def download_video_and_subtitles(url, cookies_file=COOKIES_FILE):
+# --- Download Video ---
+def download_video(url, cookies_file=COOKIES_FILE):
     ydl_opts_info = {'quiet': True}
     try:
         with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
@@ -103,28 +94,17 @@ def download_video_and_subtitles(url, cookies_file=COOKIES_FILE):
             video_title = sanitize_filename(video_title)
     except Exception as e:
         print(f"Error extracting video info: {e}")
-        return False, None, None, None
+        return None, None, None
 
     video_filename = f"{video_title} - {video_id}.mp4"
     video_file = os.path.join(VIDEOS_DIR, video_filename)
     if os.path.exists(video_file):
         print(f"Video {video_id} already exists. Reusing existing file.")
-        captions_file = video_file.replace('.mp4', '.en.vtt')
-        if not os.path.exists(captions_file):
-            captions_file = video_file.replace('.mp4', '.en.srt')
-        if os.path.exists(captions_file):
-            os.rename(captions_file, 'captions.srt')
-            has_captions = True
-        else:
-            has_captions = False
-        return has_captions, video_file, video_id, video_title
+        return video_file, video_id, video_title
 
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': video_file,
-        'writesubtitles': True,
-        'subtitleslangs': ['en'],
-        'subtitle': '--embed-subs',
         'quiet': True,
         'merge_output_format': 'mp4',
         'cookiefile': cookies_file,
@@ -138,19 +118,13 @@ def download_video_and_subtitles(url, cookies_file=COOKIES_FILE):
             video_title = sanitize_filename(video_title)
             video_filename = f"{video_title} - {video_id}.mp4"
             video_file = os.path.join(VIDEOS_DIR, video_filename)
-            subtitle_file = video_file.replace('.mp4', '.en.vtt')
-            if not os.path.exists(subtitle_file):
-                subtitle_file = video_file.replace('.mp4', '.en.srt')
-            if os.path.exists(subtitle_file):
-                os.rename(subtitle_file, 'captions.srt')
-                return True, video_file, video_id, video_title
-            return False, video_file, video_id, video_title
+            return video_file, video_id, video_title
     except Exception as e:
         print(f"Error downloading video with yt-dlp: {e}")
-        return False, None, None, None
+        return None, None, None
 
-# --- Transcription and Subtitle Parsing Functions ---
-def transcribe_audio(video_path, video_id):
+# --- Transcription Functions ---
+def transcribe_audio(video_path, video_id, update_progress=None):
     audio_path = os.path.join(AUDIO_DIR, f"{video_id}_audio.mp3")
     if os.path.exists(audio_path):
         print(f"Audio for video {video_id} already exists. Reusing existing audio file.")
@@ -193,39 +167,10 @@ def transcribe_audio(video_path, video_id):
             transcript.append(seg)
             seg_duration = seg.end - seg.start
             pbar.update(seg_duration)
+            if update_progress:
+                progress = (pbar.n / total_duration) * 100
+                update_progress(progress, stage='transcribing')
     return transcript
-
-def parse_srt(file_path):
-    with open(file_path, 'r', encoding='utf-8') as f:
-        lines = f.read().splitlines()
-    segments = []
-    i = 0
-    while i < len(lines):
-        if lines[i].isdigit():
-            i += 1
-            if i >= len(lines):
-                break
-            timestamp = lines[i].split(' --> ')
-            if len(timestamp) < 2:
-                i += 1
-                continue
-            start = timestamp[0].replace(',', '.')
-            end = timestamp[1].replace(',', '.')
-            i += 1
-            if i >= len(lines):
-                break
-            text = lines[i]
-            while i + 1 < len(lines) and lines[i + 1] and not lines[i + 1].isdigit():
-                i += 1
-                text += " " + lines[i]
-            segments.append({
-                "start": time_to_seconds(start),
-                "end": time_to_seconds(end),
-                "text": text,
-                "words": None
-            })
-        i += 1
-    return segments
 
 def group_words_with_timestamps(segments, group_size=3):
     subtitle_groups = []
@@ -238,16 +183,6 @@ def group_words_with_timestamps(segments, group_size=3):
                 end = group[-1].end
                 text = " ".join(w.word for w in group)
                 subtitle_groups.append({"start": start, "end": end, "text": text})
-        elif seg.get("words"):
-            words = seg["text"].split()
-            total_duration = seg["end"] - seg["start"]
-            if words:
-                word_duration = total_duration / len(words)
-                for i in range(0, len(words), group_size):
-                    group_words = words[i:i+group_size]
-                    start = seg["start"] + i * word_duration
-                    end = start + len(group_words) * word_duration
-                    subtitle_groups.append({"start": start, "end": end, "text": " ".join(group_words)})
         else:
             words = seg["text"].split()
             total_duration = seg["end"] - seg["start"]
@@ -260,40 +195,27 @@ def group_words_with_timestamps(segments, group_size=3):
                     subtitle_groups.append({"start": start, "end": end, "text": " ".join(group_words)})
     return subtitle_groups
 
-def create_shorts(video_path, subtitle_groups, video_id, video_title, zoom_factor=1.0):
+def create_shorts(video_path, subtitle_groups, video_id, video_title, zoom_factor=1.0, task_id=None, update_progress=None):
     try:
         video = VideoFileClip(video_path)
         print(f"Video loaded. Size: {video.size}, Duration: {video.duration}")
     except Exception as e:
         print(f"Error opening video file: {e}")
-        return
+        return None
 
-    # Step 1: Calculate scaling factor with zoom
     w, h = video.size
     target_width, target_height = 1080, 1920
     scaling_factor = min(target_width / w, target_height / h) * zoom_factor
-    new_w = int(w * scaling_factor)
-    new_h = int(h * scaling_factor)
-    print(f"Original size: ({w}, {h}), New size with zoom_factor={zoom_factor}: ({new_w}, {new_h})")
+    new_w, new_h = int(w * scaling_factor), int(h * scaling_factor)
+    video_resized = video.resize((new_w, new_h))
 
-    # Resize the video
-    try:
-        video_resized = video.resize((new_w, new_h))
-        print("Video resized successfully.")
-    except Exception as e:
-        print(f"Error resizing video: {e}")
-        return
-
-    # Step 2: Create a black background
     background = ColorClip(size=(target_width, target_height), color=(0, 0, 0)).set_duration(video.duration)
 
-    # Step 3: Create subtitle clips
     subtitle_clips = []
     for group in subtitle_groups:
         duration = group["end"] - group["start"]
         if duration <= 0:
             continue
-
         tc = TextClip(
             group["text"],
             font=subtitle_font,
@@ -305,85 +227,127 @@ def create_shorts(video_path, subtitle_groups, video_id, video_title, zoom_facto
             method='caption',
             size=(target_width - 40, None),
             kerning=-0.5,
-        )
-        tc = tc.set_start(group["start"]).set_duration(duration)
+        ).set_start(group["start"]).set_duration(duration)
         text_w, text_h = tc.size
-
-        # Calculate vertical position based on alignment and offset
-        if subtitle_vertical_align == 'bottom':
-            pos_y = target_height - text_h - subtitle_vertical_offset
-        elif subtitle_vertical_align == 'top':
-            pos_y = subtitle_vertical_offset
-        elif subtitle_vertical_align == 'center':
-            pos_y = (target_height - text_h) / 2 + subtitle_vertical_offset
-        else:
-            raise ValueError("Invalid subtitle_vertical_align. Must be 'top', 'center', or 'bottom'.")
-
+        pos_y = {
+            'bottom': target_height - text_h - subtitle_vertical_offset,
+            'top': subtitle_vertical_offset,
+            'center': (target_height - text_h) / 2 + subtitle_vertical_offset
+        }.get(subtitle_vertical_align, target_height - text_h - subtitle_vertical_offset)
         pos_y = max(0, min(pos_y, target_height - text_h))
         tc = tc.set_position(('center', pos_y))
         subtitle_clips.append(tc)
 
-    # Step 4: Composite the resized video (without subtitles yet)
-    composite_video = video_resized
-
-    # Step 5: Place the video on the background and add subtitles
-    position = ((target_width - new_w) / 2, (target_height - new_h) / 2)
     final_clip = CompositeVideoClip(
-        [background, composite_video.set_position(position)] + subtitle_clips,
+        [background, video_resized.set_position(((target_width - new_w) / 2, (target_height - new_h) / 2))] + subtitle_clips,
         size=(target_width, target_height)
     )
 
-    # Step 6: Write the output video with naming convention: <video_title> - <video_id>_edited.mp4
-    edited_filename = f"{video_title} - {video_id}_edited.mp4"
+    edited_filename = f"{task_id}_{video_title} - {video_id}_edited.mp4" if task_id else f"{video_title} - {video_id}_edited.mp4"
     output_file = os.path.join(EDITED_VIDEOS_DIR, edited_filename)
-    try:
-        final_clip.write_videofile(
-            output_file,
-            codec="libx264",
-            audio_codec="aac",
-            threads=4,
-            bitrate="8000k",
-            preset="veryslow",
-            ffmpeg_params=["-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"]
-        )
-        print(f"Video saved to: {output_file}")
-    except Exception as e:
-        print(f"Error writing video file {output_file}: {e}")
-    finally:
-        final_clip.close()
-        video.close()
-    return output_file  # Return the path of the edited video
+    temp_file = os.path.join(EDITED_VIDEOS_DIR, f"temp_{edited_filename}")
 
-def create_video_shorts(edited_video_path, video_id, video_title, segment_duration=52):
+    # Step 1: Write temporary file with MoviePy and progress
+    print("Starting MoviePy rendering...")
+    final_clip.write_videofile(
+        temp_file,
+        codec="libx264",
+        audio_codec="aac",
+        threads=4,
+        bitrate="8000k",
+        preset="medium",
+        ffmpeg_params=["-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"],
+        logger='bar',  # MoviePy progress bar
+        write_logfile=False,
+        fps=video.fps,
+        verbose=True,
+    )
+    print("MoviePy rendering complete. Temporary file created:", temp_file)
+
+    # Step 2: Use FFmpeg for final encoding with tqdm progress bar
+    print("Starting FFmpeg re-encoding...")
+    cmd = [
+        "ffmpeg", "-i", temp_file, "-c:v", "libx264", "-c:a", "aac", "-b:v", "8000k",
+        "-threads", "4", "-preset", "medium", "-progress", "-", "-nostats", "-y",
+        output_file
+    ]
+    env = os.environ.copy()
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, bufsize=1, env=env)
+    duration = video.duration
+    print(f"Video duration: {duration} seconds")
+
+    with tqdm(total=100, desc="Rendering Video", unit="%") as pbar: # tqdm for FFmpeg progress
+        last_progress = 0
+        if update_progress:
+            update_progress(0, stage='video_processing')
+        for line in process.stdout:
+            #print("FFmpeg output:", line.strip()) # Optional: Print FFmpeg output for debugging
+            if "out_time=" in line:
+                time_str = line.split("out_time=")[1].strip()
+                try:
+                    current_time = time_to_seconds(time_str)
+                    progress = min((current_time / duration) * 100, 100)
+                    if progress > last_progress:
+                        pbar.update(progress - last_progress)
+                        last_progress = progress
+                        if update_progress:
+                            update_progress(progress, stage='video_processing') # Call update_progress here!
+                except ValueError:
+                    print(f"Failed to parse time: {time_str}")
+        process.wait()
+        if last_progress < 100:
+            pbar.update(100 - last_progress)
+            if update_progress:
+                update_progress(100, stage='video_processing')
+
+    if os.path.exists(temp_file):
+        os.remove(temp_file)
+
+    print(f"Video saved to: {output_file}")
+    final_clip.close()
+    video.close()
+    return output_file
+
+def create_video_shorts(edited_video_path, video_id, video_title, segment_duration=52, task_id=None, update_progress=None):
     print("Creating video shorts...")
-    output_pattern = os.path.join(EDITED_SHORTS_DIR, f"{video_title} - {video_id}_Part %01d.mp4")
+    output_pattern = os.path.join(EDITED_SHORTS_DIR, f"{task_id}_{video_title} - {video_id}_Part %01d.mp4" if task_id else f"{video_title} - {video_id}_Part %01d.mp4")
     cmd = [
         "ffmpeg", "-i", edited_video_path, "-c", "copy", "-map", "0",
         "-segment_time", str(segment_duration), "-f", "segment",
         "-reset_timestamps", "1", output_pattern
     ]
-    try:
-        subprocess.run(cmd, check=True, capture_output=True)
-        # List generated shorts
-        shorts_files = [
-            f for f in os.listdir(EDITED_SHORTS_DIR)
-            if f.startswith(f"{video_title} - {video_id}_Part ") and f.endswith(".mp4")
-        ]
-        shorts_paths = [os.path.join(EDITED_SHORTS_DIR, f) for f in shorts_files]
-        print(f"Video shorts created: {shorts_paths}")
-        return shorts_paths
-    except subprocess.CalledProcessError as e:
-        print(f"Error creating video shorts: {e.stderr.decode()}")
-        return []
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+    duration = VideoFileClip(edited_video_path).duration
+    num_segments = int(duration // segment_duration) + (1 if duration % segment_duration else 0)
+    if update_progress:
+        update_progress(0, stage='shorts_creation')
+    segment_count = 0
+    for line in process.stdout:
+        # Look for lines indicating a new segment file is being opened
+        if "Opening" in line and ".mp4" in line:
+            segment_count += 1
+            if update_progress:
+                progress = min((segment_count / num_segments) * 100, 100)
+                update_progress(progress, stage='shorts_creation')
+    process.wait()
+    if update_progress:
+        update_progress(100, stage='shorts_creation')
+    shorts_files = [
+        f for f in os.listdir(EDITED_SHORTS_DIR)
+        if f.startswith(f"{task_id}_{video_title} - {video_id}_Part " if task_id else f"{video_title} - {video_id}_Part ") and f.endswith(".mp4")
+    ]
+    shorts_paths = [os.path.join(EDITED_SHORTS_DIR, f) for f in shorts_files]
+    print(f"Video shorts created: {shorts_paths}")
+    return shorts_paths
 
 def get_transcript_path(video_id):
     return os.path.join(TRANSCRIPT_DIR, f"{video_id}_transcript.pkl")
 
-def main(youtube_url, shorts_duration=52, cookies_file=COOKIES_FILE):
+def main(youtube_url, task_id=None, shorts_duration=52, cookies_file=COOKIES_FILE, update_progress=None):
     if not ensure_ffmpeg_installed() or not ensure_imagemagick_installed():
         raise RuntimeError("Required dependencies not installed.")
-    
-    has_captions, video_path, video_id, video_title = download_video_and_subtitles(youtube_url, cookies_file)
+
+    video_path, video_id, video_title = download_video(youtube_url, cookies_file)
     if not video_path or not video_id:
         raise ValueError("Video download failed.")
 
@@ -391,8 +355,11 @@ def main(youtube_url, shorts_duration=52, cookies_file=COOKIES_FILE):
     if os.path.exists(transcript_file):
         with open(transcript_file, 'rb') as f:
             transcript = pickle.load(f)
+        # Immediately set transcription progress to 100% if transcript exists
+        if update_progress:
+            update_progress(100, stage='transcribing')
     else:
-        transcript = parse_srt('captions.srt') if has_captions else transcribe_audio(video_path, video_id)
+        transcript = transcribe_audio(video_path, video_id, update_progress)
         if transcript:
             with open(transcript_file, 'wb') as f:
                 pickle.dump(transcript, f)
@@ -400,22 +367,24 @@ def main(youtube_url, shorts_duration=52, cookies_file=COOKIES_FILE):
             raise RuntimeError("Transcription failed.")
 
     subtitle_groups = group_words_with_timestamps(transcript, group_size=3)
-    edited_filename = f"{video_title} - {video_id}_edited.mp4"
+    edited_filename = f"{task_id}_{video_title} - {video_id}_edited.mp4" if task_id else f"{video_title} - {video_id}_edited.mp4"
     edited_video_path = os.path.join(EDITED_VIDEOS_DIR, edited_filename)
 
     if not os.path.exists(edited_video_path):
-        edited_video_path = create_shorts(video_path, subtitle_groups, video_id, video_title, zoom_factor=1.5)
+        edited_video_path = create_shorts(
+            video_path, subtitle_groups, video_id, video_title,
+            zoom_factor=1.5, task_id=task_id, update_progress=update_progress
+        )
+        if not edited_video_path:
+            raise RuntimeError("Video rendering failed.")
 
-    shorts_paths = create_video_shorts(edited_video_path, video_id, video_title, segment_duration=shorts_duration) if shorts_duration > 0 else []
+    shorts_paths = create_video_shorts(
+        edited_video_path, video_id, video_title,
+        segment_duration=shorts_duration, task_id=task_id, update_progress=update_progress
+    ) if shorts_duration > 0 else []
 
-    # Cleanup
-    for file in ["captions.srt"]:
-        if os.path.exists(file):
-            os.remove(file)
-
-    return video_id, edited_video_path, shorts_paths
+    return video_id, video_title, edited_video_path, shorts_paths
 
 if __name__ == "__main__":
-    youtube_url = input("Enter YouTube video URL: ")  # e.g., https://www.youtube.com/watch?v=PTid4KSwQTs y8wdynZ0iWg
-    use_gemini = False
-    main(youtube_url, use_gemini=use_gemini)
+    youtube_url = input("Enter YouTube video URL: ")
+    main(youtube_url)
