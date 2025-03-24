@@ -51,10 +51,12 @@ audio/
 transcripts/
 .cookies.txt
 cookies.txt
+.allcodetext.txt
+allcodetext.txt
 *.log
 .env.local
 .env.development
 .env.production
-
+*.mp4
 # Dependencies
 node_modules/

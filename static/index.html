@@ -70,8 +70,42 @@
             <button onclick="closeShortsModal()" style="margin-top:10px;">Close</button>
         </div>
     </div>
-
+    <h2>Upload Video with Timestamps</h2>
+<form id="uploadForm" enctype="multipart/form-data">
+    <label for="video">Video File:</label>
+    <input type="file" id="video" name="video" accept="video/*,.mkv" required>
+    <label for="from_time">From (HH:MM:SS):</label>
+    <input type="text" id="from_time" name="from_time" placeholder="00:00:00" pattern="\d{2}:\d{2}:\d{2}" value="00:00:00">
+    <label for="to_time">To (HH:MM:SS):</label>
+    <input type="text" id="to_time" name="to_time" placeholder="00:00:00" pattern="\d{2}:\d{2}:\d{2}" value="00:00:30" required>
+    <button type="submit">Upload and Process</button>
+</form>
 <script>
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('video', document.getElementById('video').files[0]);
+        formData.append('from_time', document.getElementById('from_time').value);
+        formData.append('to_time', document.getElementById('to_time').value);
+
+        document.getElementById('status').textContent = 'Uploading and processing...';
+        document.getElementById('videos').innerHTML = '';
+
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            const taskId = data.task_id;
+            document.getElementById('status').textContent = `Processing uploaded video task ${taskId}...`;
+            checkTaskStatus(taskId);
+        })
+        .catch(error => {
+            document.getElementById('status').textContent = 'Error uploading video.';
+            console.error(error);
+        });
+    });
     document.getElementById('videoForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const url = document.getElementById('youtube_url').value;

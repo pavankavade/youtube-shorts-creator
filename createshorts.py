@@ -385,6 +385,59 @@ def main(youtube_url, task_id=None, shorts_duration=52, cookies_file=COOKIES_FIL
 
     return video_id, video_title, edited_video_path, shorts_paths
 
+def process_uploaded_video_segment(video_path, task_id, from_time, to_time, update_progress=None):
+    if not ensure_ffmpeg_installed() or not ensure_imagemagick_installed():
+        raise RuntimeError("Required dependencies not installed.")
+
+    video_id = f"uploaded_{task_id}"
+    video_title = os.path.splitext(os.path.basename(video_path))[0]
+    
+    # Cut the video segment
+    cut_video_path = cut_video_segment(video_path, video_id, from_time, to_time)
+    
+    # Transcribe the cut segment
+    transcript_file = get_transcript_path(video_id)
+    if os.path.exists(transcript_file):
+        with open(transcript_file, 'rb') as f:
+            transcript = pickle.load(f)
+        if update_progress:
+            update_progress(100, stage='transcribing')
+    else:
+        transcript = transcribe_audio(cut_video_path, video_id, update_progress)
+        if transcript:
+            with open(transcript_file, 'wb') as f:
+                pickle.dump(transcript, f)
+        else:
+            raise RuntimeError("Transcription failed.")
+
+    # Create subtitles and zoomed video
+    subtitle_groups = group_words_with_timestamps(transcript, group_size=3)
+    edited_filename = f"{task_id}_{video_title} - {video_id}_edited.mp4"
+    edited_video_path = os.path.join(EDITED_VIDEOS_DIR, edited_filename)
+
+    if not os.path.exists(edited_video_path):
+        edited_video_path = create_shorts(
+            cut_video_path, subtitle_groups, video_id, video_title,
+            zoom_factor=1.5, task_id=task_id, update_progress=update_progress
+        )
+        if not edited_video_path:
+            raise RuntimeError("Video rendering failed.")
+    
+    # Clean up the cut video file
+    if os.path.exists(cut_video_path):
+        os.remove(cut_video_path)
+
+    return video_id, video_title, edited_video_path
+def cut_video_segment(video_path, video_id, from_time, to_time):
+    output_path = os.path.join(VIDEOS_DIR, f"{video_id}_cut.mp4")
+    cmd = [
+        "ffmpeg", "-i", video_path, "-ss", from_time, "-to", to_time,
+        "-map", "0:v:0", "-map", "0:a:0",
+        "-c:v", "libx264", "-c:a", "aac", "-y", output_path
+    ]
+    subprocess.run(cmd, check=True, capture_output=True)
+    return output_path
+
 if __name__ == "__main__":
     youtube_url = input("Enter YouTube video URL: ")
     main(youtube_url)
