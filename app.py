@@ -1,32 +1,38 @@
-# app.py
 from flask import Flask, request, jsonify, send_from_directory, url_for
 from flask_sqlalchemy import SQLAlchemy
 import threading
 import os
 import json
-from createshorts import main, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR,VIDEOS_DIR,process_uploaded_video_segment
+import subprocess
+from werkzeug.utils import secure_filename
+from createshorts import process_video, VIDEOS_DIR, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR
+from google import genai
+from google.genai import types
 import logging
 
-# Add imports for handling file uploads
-from werkzeug.utils import secure_filename
-
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'
+app = Flask(__name__, static_url_path='', static_folder='static')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///shorts.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-class Task(db.Model):
+# Database Models
+class Video(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    youtube_url = db.Column(db.String(255), nullable=False)
-    shorts_duration = db.Column(db.Integer, nullable=False)
+    original_filename = db.Column(db.String(512), nullable=False)
+    edited_filename = db.Column(db.String(512))
     status = db.Column(db.String(20), default='pending')
-    video_id = db.Column(db.String(50))
     video_title = db.Column(db.String(512))
-    edited_video_filename = db.Column(db.String(512))
-    shorts_filenames = db.Column(db.Text)
-    transcription_progress = db.Column(db.Float, default=0.0)  # Progress for transcription (0-100%)
-    rendering_progress = db.Column(db.Float, default=0.0)      # Progress for video rendering (0-100%)
-    shorts_progress = db.Column(db.Float, default=0.0)         # Progress for shorts creation (0-100%)
+    transcript = db.Column(db.Text)  # New field to store the transcript
+
+class ShortSegment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    video_id = db.Column(db.Integer, db.ForeignKey('video.id'), nullable=False)
+    short_name = db.Column(db.String(100), nullable=False)  # New field: shortname
+    short_description = db.Column(db.Text, nullable=False)  # Renamed to short_description
+    start_time = db.Column(db.String(8), nullable=False)    # hh:mm:ss
+    end_time = db.Column(db.String(8), nullable=False)      # hh:mm:ss
+    short_filename = db.Column(db.String(512))
+    status = db.Column(db.String(20), default='pending')
 
 with app.app_context():
     db.create_all()
@@ -34,118 +40,347 @@ with app.app_context():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def update_progress(task_id, progress, stage):
-    """Update the task's progress and log it."""
-    with app.app_context():
-        task = Task.query.get(task_id)
-        if stage == 'transcribing':
-            task.transcription_progress = progress
-        elif stage == 'video_processing':
-            task.rendering_progress = progress
-        elif stage == 'shorts_creation':
-            task.shorts_progress = progress
-        db.session.commit()
-    logger.info(f"Task {task_id} - {stage}: {progress}%")
+# Helper Functions
+def format_transcript(transcript):
+    formatted = ""
+    for seg in transcript:
+        start = seg.start
+        end = seg.end
+        text = seg.text
+        start_str = f"{int(start // 3600):02}:{int((start % 3600) // 60):02}:{int(start % 60):02}"
+        end_str = f"{int(end // 3600):02}:{int((end % 3600) // 60):02}:{int(end % 60):02}"
+        formatted += f"[{start_str} - {end_str}] {text}\n"
+    return formatted
 
-def process_video(task_id):
+def get_suggested_segments(transcript):
+    api_key = os.environ.get('GEMINI_API_KEY')
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY not set in environment")
+    
+    client = genai.Client(api_key=api_key)
+    prompt = (
+        "Analyze the following video transcript and suggest engaging segments"
+        "Each segment should be more than 50 seconds long but should be less than 60 seconds\n\n"
+        "If a segment is longer than 1 minute, break it into multiple parts as part 1, part 2. Return the result as a JSON array where each object contains: "
+        "'shortname' (a short, unique name for the clip), 'shortdescription' (a brief description), 'starttime' (in hh:mm:ss format), and 'endtime' (in hh:mm:ss format).\n\n" + transcript
+    )
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[prompt],
+        config=types.GenerateContentConfig(
+            max_output_tokens=8000,
+            temperature=0.1
+        )
+    )
+    logger.info(f"Gemini API raw response: {response.text}")
+    # Strip Markdown code block syntax
+    cleaned_response = response.text.strip()
+    if cleaned_response.startswith("```json"):
+        cleaned_response = cleaned_response[7:]  # Remove ```json
+    if cleaned_response.endswith("```"):
+        cleaned_response = cleaned_response[:-3]  # Remove ```
+    cleaned_response = cleaned_response.strip()  # Remove any remaining whitespace
+    logger.info(f"Cleaned Gemini response: {cleaned_response}")
+    return cleaned_response
+
+def parse_segments(response_text):
+    try:
+        segments = json.loads(response_text)
+        if not isinstance(segments, list):
+            raise ValueError("Expected a JSON array")
+        for seg in segments:
+            if not all(k in seg for k in ['shortname', 'shortdescription', 'starttime', 'endtime']):
+                raise ValueError("Missing required fields in segment")
+            # Normalize key names here if needed
+            seg['short_name'] = seg.pop('shortname')  # Convert 'shortname' to 'short_name'
+            seg['short_description'] = seg.pop('shortdescription')
+            seg['start_time'] = seg.pop('starttime')
+            seg['end_time'] = seg.pop('endtime')
+        logger.info(f"Parsed segments: {segments}")
+        return segments
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        return []
+    except ValueError as e:
+        logger.error(f"Invalid segment format: {e}")
+        return []
+    
+def process_uploaded_video(video_id):
     with app.app_context():
-        task = Task.query.get(task_id)
-        task.status = 'processing'
+        video = Video.query.get(video_id)
+        video.status = 'processing'
         db.session.commit()
         try:
-            def progress_callback(progress, stage='transcribing'):
-                update_progress(task_id, progress, stage)
+            original_video_path = os.path.join(VIDEOS_DIR, video.original_filename)
+            edited_filename = f"{os.path.splitext(video.original_filename)[0]}_edited.mp4"
+            edited_video_path = os.path.join(EDITED_VIDEOS_DIR, edited_filename)
 
-            video_id, video_title, edited_video_path, shorts_paths = main(
-                task.youtube_url,
-                task.id,
-                shorts_duration=task.shorts_duration,
-                update_progress=progress_callback
-            )
-            task.video_id = video_id
-            task.video_title = video_title
-            task.edited_video_filename = os.path.basename(edited_video_path)
-            task.shorts_filenames = json.dumps([os.path.basename(p) for p in shorts_paths])
-            task.status = 'completed'
-        except Exception as e:
-            task.status = 'failed'
-            logger.error(f"Error processing task {task_id}: {e}")
-        finally:
+            if os.path.exists(edited_video_path):
+                logger.info(f"Edited video {edited_filename} already exists, skipping processing.")
+                transcript = process_video(original_video_path, edited_filename, skip_editing=True)
+                if not video.edited_filename:
+                    video.edited_filename = edited_filename
+            else:
+                edited_video_path, transcript = process_video(original_video_path, edited_filename)
+                video.edited_filename = edited_filename
+
+            video.video_title = os.path.splitext(video.original_filename)[0]
+            video.transcript = format_transcript(transcript)  # Save the formatted transcript
             db.session.commit()
+
+            formatted_transcript = format_transcript(transcript)
+            response_text = get_suggested_segments(formatted_transcript)
+            segments = parse_segments(response_text)
+
+            for seg in segments:
+                segment = ShortSegment(
+                    video_id=video_id,
+                    short_name=seg['short_name'],
+                    short_description=seg['short_description'],
+                    start_time=seg['start_time'],
+                    end_time=seg['end_time'],
+                    status='pending'
+                )
+                db.session.add(segment)
+            video.status = 'completed'
+            db.session.commit()
+            logger.info(f"Video {video_id} processing completed successfully.")
+        except Exception as e:
+            video.status = 'failed'
+            logger.error(f"Error processing video {video_id}: {e}", exc_info=True)
+            db.session.commit()
+
+def process_short(video_id, short_id):
+    with app.app_context():
+        video = Video.query.get(video_id)
+        short = ShortSegment.query.get(short_id)
+        try:
+            short.status = 'processing'
+            db.session.commit()
+            if not video.edited_filename:
+                raise ValueError("Edited video not found")
+            edited_video_path = os.path.join(EDITED_VIDEOS_DIR, video.edited_filename)
+            if not os.path.exists(edited_video_path):
+                raise FileNotFoundError(f"Edited video file not found: {edited_video_path}")
+            start_time = short.start_time
+            end_time = short.end_time
             
+            # Calculate duration in seconds
+            start_seconds = time_to_seconds(start_time)
+            end_seconds = time_to_seconds(end_time)
+            duration = end_seconds - start_seconds
+            
+            # New filename format: shortname-short_description.mp4
+            short_filename = f"{short.short_name}-{short.short_description.replace(' ', '_').replace('/', '-')}.mp4"
+            short_filename = secure_filename(short_filename)  # Sanitize the filename
+            short_path = os.path.join(EDITED_SHORTS_DIR, short_filename)
+            
+            subprocess.run([
+                "ffmpeg", "-ss", start_time, "-i", edited_video_path, "-t", str(duration),
+                "-c", "copy", "-avoid_negative_ts", "make_zero", "-y", short_path
+            ], check=True)
+            
+            short.short_filename = short_filename
+            short.status = 'completed'
+            db.session.commit()
+            logger.info(f"Short {short_id} created successfully from edited video.")
+        except Exception as e:
+            short.status = 'failed'
+            logger.error(f"Error creating short {short_id}: {e}")
+            db.session.commit()
 
-@app.route('/tasks', methods=['POST'])
-def create_task():
-    data = request.json
-    youtube_url = data.get('youtube_url')
-    shorts_duration = data.get('shorts_duration', 52)
-    if not youtube_url:
-        return jsonify({'error': 'YouTube URL is required'}), 400
-    task = Task(youtube_url=youtube_url, shorts_duration=shorts_duration)
-    db.session.add(task)
+def time_to_seconds(time_str):
+    h, m, s = map(int, time_str.split(':'))
+    return h * 3600 + m * 60 + s
+
+# Endpoints
+@app.route('/upload', methods=['POST'])
+def upload_video():
+    if 'video' not in request.files:
+        return jsonify({'error': 'No video file provided'}), 400
+    video_file = request.files['video']
+    filename = secure_filename(video_file.filename)
+    video_path = os.path.join(VIDEOS_DIR, filename)
+    video_file.save(video_path)
+
+    video = Video(original_filename=os.path.basename(video_path), status='pending')
+    db.session.add(video)
     db.session.commit()
-    threading.Thread(target=process_video, args=(task.id,)).start()
-    return jsonify({'task_id': task.id}), 202
 
-@app.route('/tasks/<int:task_id>', methods=['GET'])
-def get_task_status(task_id):
-    task = Task.query.get(task_id)
-    if not task:
-        return jsonify({'error': 'Task not found'}), 404
-    response = {
-        'status': task.status,
-        'progress': {
-            'transcription': task.transcription_progress,
-            'rendering': task.rendering_progress,
-            'shorts': task.shorts_progress
-        }
-    }
-    if task.status == 'completed':
-        response['edited_video_url'] = url_for('serve_edited_video', filename=task.edited_video_filename, _external=True)
-        response['shorts_urls'] = [
-            url_for('serve_short', filename=f, _external=True)
-            for f in json.loads(task.shorts_filenames or '[]')
-        ]
-    return jsonify(response) 
+    threading.Thread(target=process_uploaded_video, args=(video.id,)).start()
+    return jsonify({'video_id': video.id}), 202
 
-@app.route('/tasks', methods=['GET'])
-def get_tasks():
-    tasks = Task.query.filter_by(status='completed').all()
-    tasks_data = [
-        {
-            'id': task.id,
-            'video_title': task.video_title,
-            'youtube_url': task.youtube_url,
-            'edited_video_url': url_for('serve_edited_video', filename=task.edited_video_filename, _external=True),
-            'shorts_urls': [url_for('serve_short', filename=f, _external=True) for f in json.loads(task.shorts_filenames or '[]')]
-        }
-        for task in tasks
-    ]
-    return jsonify(tasks_data)
+@app.route('/videos', methods=['GET'])
+def get_videos():
+    videos = Video.query.filter_by(status='completed').all()
+    return jsonify([{
+        'id': v.id,
+        'title': v.video_title,
+        'edited_video_url': url_for('serve_edited_video', filename=v.edited_filename, _external=True) if v.edited_filename else None,
+        'shorts': [{
+            'id': s.id,
+            'short_name': s.short_name,
+            'short_description': s.short_description,
+            'start_time': s.start_time,
+            'end_time': s.end_time,
+            'status': s.status,
+            'short_url': url_for('serve_short', filename=s.short_filename, _external=True) if s.short_filename else None
+        } for s in ShortSegment.query.filter_by(video_id=v.id).all()]
+    } for v in videos])
 
-@app.route('/tasks/<int:task_id>', methods=['DELETE'])
-def delete_task(task_id):
-    task = Task.query.get(task_id)
-    if not task:
-        return jsonify({'error': 'Task not found'}), 404
+@app.route('/videos/<int:video_id>/shorts/<int:short_id>/create', methods=['POST'])
+def create_short(video_id, short_id):
+    short = ShortSegment.query.get(short_id)
+    if not short or short.video_id != video_id:
+        return jsonify({'error': 'Short not found'}), 404
+    if short.status != 'pending':
+        return jsonify({'error': 'Short already processed'}), 400
+    threading.Thread(target=process_short, args=(video_id, short_id)).start()
+    return jsonify({'message': 'Short creation started'}), 202
+
+@app.route('/videos/<int:video_id>', methods=['DELETE'])
+def delete_video(video_id):
+    video = Video.query.get(video_id)
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
     try:
-        # Delete edited video file
-        edited_video_path = os.path.join(EDITED_VIDEOS_DIR, task.edited_video_filename)
-        if os.path.exists(edited_video_path):
-            os.remove(edited_video_path)
-        # Delete shorts files
-        shorts_filenames = json.loads(task.shorts_filenames or '[]')
-        for filename in shorts_filenames:
-            short_path = os.path.join(EDITED_SHORTS_DIR, filename)
-            if os.path.exists(short_path):
-                os.remove(short_path)
-        # Delete database record
-        db.session.delete(task)
+        # Delete files
+        for path, filename in [
+            (VIDEOS_DIR, video.original_filename),
+            (EDITED_VIDEOS_DIR, video.edited_filename)
+        ]:
+            file_path = os.path.join(path, filename)
+            if filename and os.path.exists(file_path):
+                os.remove(file_path)
+        for short in ShortSegment.query.filter_by(video_id=video_id).all():
+            if short.short_filename:
+                short_path = os.path.join(EDITED_SHORTS_DIR, short.short_filename)
+                if os.path.exists(short_path):
+                    os.remove(short_path)
+            db.session.delete(short)
+        db.session.delete(video)
         db.session.commit()
-        return jsonify({'message': 'Task deleted successfully'}), 200
+        return jsonify({'message': 'Video deleted'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+    
+# In app.py, add this new function above the endpoints
+def refresh_video_shorts(video_id):
+    with app.app_context():
+        video = Video.query.get(video_id)
+        if not video:
+            return
+        try:
+            video.status = 'processing'
+            db.session.commit()
+
+            # Use existing transcript if available, otherwise re-transcribe
+            if video.transcript:
+                logger.info(f"Reusing existing transcript for video {video_id}.")
+                formatted_transcript = video.transcript
+            else:
+                logger.info(f"No existing transcript found for video {video_id}, re-transcribing.")
+                original_video_path = os.path.join(VIDEOS_DIR, video.original_filename)
+                transcript = process_video(original_video_path, video.edited_filename, skip_editing=True)
+                formatted_transcript = format_transcript(transcript)
+                video.transcript = formatted_transcript  # Save it for future use
+                db.session.commit()
+
+            # Get new segments from Gemini
+            response_text = get_suggested_segments(formatted_transcript)
+            new_segments = parse_segments(response_text)
+
+            # Keep completed shorts and remove others
+            existing_shorts = ShortSegment.query.filter_by(video_id=video_id).all()
+            completed_shorts = {s.id: s for s in existing_shorts if s.status == 'completed'}
+            for short in existing_shorts:
+                if short.status != 'completed':
+                    if short.short_filename:
+                        short_path = os.path.join(EDITED_SHORTS_DIR, short.short_filename)
+                        if os.path.exists(short_path):
+                            os.remove(short_path)
+                    db.session.delete(short)
+
+            # Add new segments, avoiding duplicates with completed shorts
+            existing_short_names = {s.short_name for s in completed_shorts.values()}
+            for seg in new_segments:
+                if seg['short_name'] not in existing_short_names:
+                    segment = ShortSegment(
+                        video_id=video_id,
+                        short_name=seg['short_name'],
+                        short_description=seg['short_description'],
+                        start_time=seg['start_time'],
+                        end_time=seg['end_time'],
+                        status='pending'
+                    )
+                    db.session.add(segment)
+
+            video.status = 'completed'
+            db.session.commit()
+            logger.info(f"Shorts refreshed for video {video_id}.")
+        except Exception as e:
+            video.status = 'failed'
+            logger.error(f"Error refreshing shorts for video {video_id}: {e}", exc_info=True)
+            db.session.commit()
+
+@app.route('/videos/<int:video_id>/shorts/<int:short_id>/update', methods=['POST'])
+def update_short(video_id, short_id):
+    short = ShortSegment.query.get(short_id)
+    if not short or short.video_id != video_id:
+        return jsonify({'error': 'Short not found'}), 404
+    
+    data = request.get_json()
+    if not data or 'start_time' not in data or 'end_time' not in data:
+        return jsonify({'error': 'Missing start_time or end_time'}), 400
+    
+    start_time = data['start_time']
+    end_time = data['end_time']
+    
+    # Optional: Add validation for time format (hh:mm:ss)
+    import re
+    time_pattern = r'^\d{2}:\d{2}:\d{2}$'
+    if not (re.match(time_pattern, start_time) and re.match(time_pattern, end_time)):
+        return jsonify({'error': 'Invalid time format. Use hh:mm:ss'}), 400
+    
+    try:
+        short.start_time = start_time
+        short.end_time = end_time
+        db.session.commit()
+        return jsonify({'message': 'Short updated successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating short {short_id}: {e}")
+        return jsonify({'error': 'Failed to update short'}), 500
+
+# Add the new endpoint below the existing endpoints
+@app.route('/videos/<int:video_id>/refresh', methods=['POST'])
+def refresh_shorts(video_id):
+    video = Video.query.get(video_id)
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
+    if video.status == 'processing':
+        return jsonify({'error': 'Video is already being processed'}), 400
+    threading.Thread(target=refresh_video_shorts, args=(video_id,)).start()
+    return jsonify({'message': 'Shorts refresh started'}), 202
+
+@app.route('/videos/<int:video_id>/shorts/<int:short_id>/recreate', methods=['POST'])
+def recreate_short(video_id, short_id):
+    short = ShortSegment.query.get(short_id)
+    if not short or short.video_id != video_id:
+        return jsonify({'error': 'Short not found'}), 404
+    if short.status != 'completed':
+        return jsonify({'error': 'Short is not completed'}), 400
+    # Reset status and remove existing file
+    short.status = 'pending'
+    if short.short_filename:
+        short_path = os.path.join(EDITED_SHORTS_DIR, short.short_filename)
+        if os.path.exists(short_path):
+            os.remove(short_path)
+        short.short_filename = None
+    db.session.commit()
+    threading.Thread(target=process_short, args=(video_id, short_id)).start()
+    return jsonify({'message': 'Short recreation started'}), 202
 
 @app.route('/edited-videos/<path:filename>')
 def serve_edited_video(filename):
@@ -159,57 +394,21 @@ def serve_short(filename):
 def index():
     return app.send_static_file('index.html')
 
+import socket
 
-@app.route('/upload', methods=['POST'])
-def upload_video():
-    if 'video' not in request.files:
-        return jsonify({'error': 'No video file provided'}), 400
-    
-    video_file = request.files['video']
-    from_time = request.form.get('from_time')
-    to_time = request.form.get('to_time')
-    
-    if not video_file or not from_time or not to_time:
-        return jsonify({'error': 'Video file, from_time, and to_time are required'}), 400
-    
-    filename = secure_filename(video_file.filename)
-    temp_video_path = os.path.join(VIDEOS_DIR, f"uploaded_{filename}")
-    video_file.save(temp_video_path)
-    
-    task = Task(youtube_url=f"uploaded://{filename}", shorts_duration=0, status='pending')
-    db.session.add(task)
-    db.session.commit()
-    
-    threading.Thread(target=process_uploaded_video, args=(task.id, temp_video_path, from_time, to_time)).start()
-    return jsonify({'task_id': task.id}), 202
-
-def process_uploaded_video(task_id, video_path, from_time, to_time):
-    with app.app_context():
-        task = Task.query.get(task_id)
-        task.status = 'processing'
-        db.session.commit()
-        try:
-            def progress_callback(progress, stage='transcribing'):
-                update_progress(task_id, progress, stage)
-
-            # Delegate processing to createshorts.py
-            video_id, video_title, edited_video_path = process_uploaded_video_segment(
-                video_path, task_id, from_time, to_time, update_progress=progress_callback
-            )
-            
-            task.video_id = video_id
-            task.video_title = video_title
-            task.edited_video_filename = os.path.basename(edited_video_path)
-            task.shorts_filenames = json.dumps([])  # No shorts for uploaded videos
-            task.status = 'completed'
-        except Exception as e:
-            task.status = 'failed'
-            logger.error(f"Error processing uploaded video task {task_id}: {e}")
-        finally:
-            if os.path.exists(video_path):
-                os.remove(video_path)
-            db.session.commit()
-
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Connect to an external address to get the local IP (doesn’t send data)
+        s.connect(('10.255.255.255', 1))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1'  # Fallback to localhost if detection fails
+    finally:  
+        s.close()
+    return ip
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    local_ip = get_local_ip()
+    print(f"Server running at http://{local_ip}:5000")
+    app.run(host='0.0.0.0', port=5000, debug=True)
