@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Responsive viewport -->
     <title>Video Shorts Generator</title>
-    <!-- Consider linking a separate CSS file -->
+    <!-- Consider linking a separate CSS file for better organization -->
     <!-- <link rel="stylesheet" href="styles.css"> -->
     <style>
         :root {
@@ -25,9 +25,16 @@
             --light-gray: #f8f9fa;
             --medium-gray: #e9ecef;
             --border-color: #dee2e6;
-            --border-radius: 4px;
-            --box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            --border-radius: 5px; /* Slightly increased for softer look */
+            --box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            --box-shadow-light: 0 1px 3px rgba(0,0,0,0.08);
         }
+
+        /* Basic Reset & Box Sizing */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             margin: 20px;
@@ -35,139 +42,366 @@
             background-color: var(--light-gray);
             color: var(--text-color);
         }
-        h1, h2 { color: var(--text-color); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;}
+
+        /* Sections */
+        #uploadSection, #videosTableContainer {
+             background-color: #fff;
+             padding: 20px;
+             margin-bottom: 25px;
+             border-radius: var(--border-radius);
+             box-shadow: var(--box-shadow);
+        }
+
+        h1, h2 {
+            color: var(--text-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-top: 0; /* Remove default top margin */
+            margin-bottom: 20px;
+        }
+        h1 { font-size: 1.8rem; }
+        h2 { font-size: 1.5rem; }
+
         hr { border: 0; border-top: 1px solid var(--border-color); margin: 30px 0; }
-        label { margin-right: 10px; font-weight: bold;}
-        input[type="file"], button {
-             padding: 8px 12px;
+
+        label {
+             margin-right: 10px;
+             font-weight: bold;
+             display: block; /* Default to block for stacking */
+             margin-bottom: 5px;
+        }
+
+        input[type="file"], input[type="text"], button {
+             padding: 10px 15px; /* Increased padding */
              margin: 5px 0;
              border-radius: var(--border-radius);
              border: 1px solid var(--border-color);
              font-size: 1rem;
+             vertical-align: middle; /* Align better with text/other elements */
         }
+         input[type="text"] {
+             width: 100%; /* Default to full width, containers will manage */
+         }
+         input[type="file"] {
+              width: 100%;
+              border: 1px dashed var(--border-color); /* Style file input */
+              background-color: var(--light-gray);
+              cursor: pointer;
+         }
+         input[type="file"]:hover {
+             border-color: var(--primary-color);
+         }
+
         button {
              cursor: pointer;
              background-color: var(--primary-color);
              color: white;
              border: none;
-             transition: background-color 0.2s ease-in-out;
+             transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
         }
         button:hover:not(:disabled) { background-color: var(--primary-hover); }
         button:disabled { background-color: #cccccc; cursor: not-allowed; opacity: 0.7; }
         button.danger { background-color: var(--danger-color); }
         button.danger:hover:not(:disabled) { background-color: var(--danger-hover); }
 
-        .status { margin-top: 10px; font-style: italic; color: #555; min-height: 1.2em; padding: 5px; border-radius: var(--border-radius); } /* Reserve space */
-        .status-processing { color: var(--processing-color); font-weight: bold;}
-        .status-completed { color: var(--completed-color); font-weight: bold;}
-        .status-failed { color: var(--failed-color); font-weight: bold; background-color: #f8d7da; border: 1px solid #f5c6cb;}
-        .status-pending { color: var(--pending-color); }
-        .status-queued { color: var(--queued-color); font-weight: bold;}
-        .status-pending_reprocess { color: var(--pending-reprocess-color); font-weight: bold;}
+        .status {
+             margin-top: 15px;
+             font-style: italic;
+             color: #555;
+             min-height: 1.2em;
+             padding: 10px;
+             border-radius: var(--border-radius);
+             border: 1px solid transparent; /* Reserve space for border */
+        }
+        .status-processing { color: var(--processing-color); font-weight: bold; background-color: #fff8e1; border-color: var(--processing-color);}
+        .status-completed { color: var(--completed-color); font-weight: bold; background-color: #e9f7ef; border-color: var(--completed-color);}
+        .status-failed { color: var(--failed-color); font-weight: bold; background-color: #fdeded; border-color: var(--failed-color);}
+        .status-pending { color: var(--pending-color); background-color: #f8f9fa; border-color: var(--pending-color);}
+        .status-queued { color: var(--queued-color); font-weight: bold; background-color: #e3f2fd; border-color: var(--info-color);}
+        .status-pending_reprocess { color: var(--pending-reprocess-color); font-weight: bold; background-color: #f3e5f5; border-color: var(--pending-reprocess-color);}
+        .status-info { color: var(--info-color); background-color: #e3f2fd; border-color: var(--info-color);} /* Added for general info */
 
         small { font-size: 0.85em; color: #555; display: block; margin-top: 2px; word-break: break-all; }
 
-        /* Subtitle Upload Form Styling */
-        .subtitle-upload-form {
-            margin-top: 8px;
-            display: flex;
-            flex-wrap: wrap; /* Allow wrapping on smaller screens */
-            align-items: center;
-            gap: 5px;
-            border-top: 1px solid var(--medium-gray);
-            padding-top: 8px;
+        /* Upload Form Specifics */
+         #uploadForm {
+              display: flex;
+              flex-direction: column;
+              gap: 15px;
+         }
+         #uploadForm label {
+              margin-bottom: 0; /* Remove bottom margin as gap handles it */
+         }
+         #uploadForm button {
+              margin-top: 10px;
+              align-self: flex-start; /* Prevent button stretching full width */
+         }
+
+        /* Table styling */
+        #videosTableContainer {
+             overflow-x: auto; /* Add horizontal scroll for small screens */
+             padding: 0; /* Remove container padding, table handles it */
         }
-        .subtitle-upload-form label { font-weight: normal; font-size: 0.9em; margin: 0; flex-shrink: 0;}
+        #videosTable {
+             width: 100%;
+             border-collapse: collapse;
+             /* Removed margin-top as container handles spacing */
+             background-color: #fff;
+             /* Removed shadow/radius from table, container has it */
+             /* overflow: hidden; /* Can cause issues with shadows on scrolled content */
+        }
+        #videosTable th, #videosTable td {
+             border: 1px solid var(--border-color);
+             padding: 12px 15px;
+             text-align: left;
+             vertical-align: middle; /* Align content vertically */
+             word-break: break-word; /* Allow long words to break */
+        }
+        #videosTable th {
+             background-color: var(--medium-gray);
+             font-weight: bold;
+             white-space: nowrap; /* Prevent headers from wrapping */
+        }
+        /* Column widths - Adjust as needed */
+        #videosTable th:nth-child(1), #videosTable td:nth-child(1) { width: 5%; text-align: center; } /* ID */
+        #videosTable th:nth-child(2), #videosTable td:nth-child(2) { width: 30%; } /* Details */
+        #videosTable th:nth-child(3), #videosTable td:nth-child(3) { width: 10%; text-align: center; } /* Full Video */
+        #videosTable th:nth-child(4), #videosTable td:nth-child(4) { width: 15%; text-align: center; } /* Shorts Button */
+        #videosTable th:nth-child(5), #videosTable td:nth-child(5) { width: 40%; } /* Actions & Subtitles */
+
+        #videosTable td .button-group {
+             display: flex;
+             flex-wrap: wrap;
+             gap: 8px; /* Increased gap */
+             align-items: center;
+        }
+        #videosTable td .button-group button {
+             margin: 0; /* Remove default margin */
+             padding: 6px 10px; /* Slightly smaller buttons in table */
+             font-size: 0.9em;
+        }
+
+        /* Subtitle Upload Form Styling (within table) */
+        .subtitle-upload-form {
+            margin-top: 10px; /* Space above this form */
+            display: flex;
+            flex-wrap: wrap; /* Allow wrapping */
+            align-items: center;
+            gap: 8px;
+            border-top: 1px solid var(--medium-gray);
+            padding-top: 10px;
+        }
+        .subtitle-upload-form label {
+             font-weight: normal;
+             font-size: 0.9em;
+             margin: 0; /* Remove default label margins */
+             flex-shrink: 0; /* Prevent label from shrinking */
+             display: inline-block; /* Allow inline display */
+             width: auto; /* Override block display */
+        }
         .subtitle-upload-form input[type="file"] {
              margin: 0;
-             padding: 4px;
+             padding: 6px;
              flex-grow: 1; /* Allow file input to take available space */
              font-size: 0.9em;
-             min-width: 150px; /* Ensure it's usable */
-             border-color: var(--medium-gray);
+             width: auto; /* Override 100% width */
+             min-width: 150px; /* Ensure usability */
+             border-style: solid; /* Override dashed */
+             background-color: white;
         }
          .subtitle-upload-form button {
              margin: 0;
-             padding: 4px 8px;
+             padding: 6px 10px;
              font-size: 0.9em;
-             flex-shrink: 0;
+             flex-shrink: 0; /* Prevent button from shrinking */
          }
 
          /* Modal Styles */
-         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); animation: fadeIn 0.3s; }
-         .modal-content { background-color: #fff; margin: 5% auto; padding: 25px; border: 1px solid var(--border-color); width: 90%; max-width: 800px; position: relative; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s; }
-         .close-button { position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; line-height: 1; }
+         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); /* Darker overlay */ animation: fadeIn 0.3s; }
+         .modal-content { background-color: #fff; margin: 5% auto; padding: 25px; border: none; width: 90%; max-width: 800px; position: relative; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s; }
+         .close-button { position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; line-height: 1; background: none; border: none; padding: 0; }
          .close-button:hover { color: var(--text-color); }
-         #modalVideo { width: 100%; max-height: 70vh; height: auto; background-color: #000; border-radius: var(--border-radius); } /* Max height for video */
+         #modalVideo { width: 100%; max-height: 70vh; height: auto; background-color: #000; border-radius: var(--border-radius); display: block; } /* Added display block */
 
-         /* Shorts List Styling */
-         #shortsList .short-item { border-bottom: 1px solid var(--medium-gray); padding: 15px 0; }
-         #shortsList .short-item:last-child { border-bottom: none; }
-         #shortsList label { margin-right: 5px; display: inline-block; min-width: 50px; font-weight: normal;}
-         #shortsList input[type="text"] { width: 90px; padding: 6px; font-size: 0.9em; margin-right: 10px; border-radius: var(--border-radius); border: 1px solid var(--medium-gray);}
-         #shortsList .short-actions button { margin-left: 5px; margin-top: 8px; padding: 5px 10px; font-size: 0.9em; }
-         #shortsList p { margin: 5px 0; }
-         #shortsList .short-info strong { font-size: 1.1em;}
-
-         /* Table styling */
-         #videosTableContainer { overflow-x: auto; } /* Add horizontal scroll for small screens */
-         #videosTable { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #fff; box-shadow: var(--box-shadow); border-radius: var(--border-radius); overflow: hidden;}
-         #videosTable th, #videosTable td { border: 1px solid var(--border-color); padding: 12px; text-align: left; vertical-align: top; }
-         #videosTable th { background-color: var(--medium-gray); font-weight: bold; }
-         /* Column widths */
-         #videosTable th:nth-child(1), #videosTable td:nth-child(1) { width: 5%; text-align: center; } /* ID */
-         #videosTable th:nth-child(2), #videosTable td:nth-child(2) { width: 30%; } /* Title / Filename / Status */
-         #videosTable th:nth-child(3), #videosTable td:nth-child(3) { width: 10%; text-align: center; } /* Full Video */
-         #videosTable th:nth-child(4), #videosTable td:nth-child(4) { width: 15%; text-align: center; } /* Shorts Button */
-         #videosTable th:nth-child(5), #videosTable td:nth-child(5) { width: 40%; } /* Actions & Subtitles */
-         #videosTable td .button-group { display: flex; flex-wrap: wrap; gap: 5px;} /* Group buttons */
-         #videosTable td .button-group button { margin: 0;}
-         #uploadForm label {
-            display: block; /* Make labels block elements */
-            margin-top: 10px;
+         /* Shorts List Styling (Inside Modal) */
+         #shortsList { margin-top: 20px; }
+         #shortsList .short-item {
+             border: 1px solid var(--medium-gray); /* Use border instead of just bottom */
+             background-color: var(--light-gray);
+             padding: 15px;
+             margin-bottom: 15px; /* Space between items */
+             border-radius: var(--border-radius);
+             box-shadow: var(--box-shadow-light);
         }
-         #uploadForm input[type="file"] {
-              display: block; /* Make file inputs block elements */
-              width: calc(100% - 20px); /* Adjust width */
+         /* #shortsList .short-item:last-child { border-bottom: 1px solid var(--medium-gray); } */ /* Remove last-child rule */
+         #shortsList p { margin: 5px 0 10px 0; }
+         #shortsList .short-info strong { font-size: 1.1em;}
+         #shortsList .short-time {
+              display: flex;
+              flex-wrap: wrap; /* Allow wrapping on small screens */
+              align-items: center;
+              gap: 8px;
               margin-bottom: 10px;
+              border-top: 1px dashed var(--border-color);
+              padding-top: 10px;
+              margin-top: 10px;
          }
-         #uploadForm button {
-              margin-top: 15px;
+         #shortsList .short-time label {
+             font-weight: normal;
+             margin: 0;
+             font-size: 0.9em;
+             display: inline-block; /* Override block */
+             width: auto; /* Override block */
+         }
+         #shortsList .short-time input[type="text"] {
+             padding: 6px 8px;
+             font-size: 0.9em;
+             margin: 0;
+             border: 1px solid var(--medium-gray);
+             /* Flexible width: takes available space, min/max limits */
+             flex: 1 1 auto;
+             min-width: 75px; /* Ensure usable width */
+             max-width: 100px; /* Prevent growing too large */
+             width: auto; /* Override 100% default */
+         }
+         #shortsList .short-time button {
+             padding: 6px 10px;
+             font-size: 0.9em;
+             margin: 0;
+             flex-shrink: 0; /* Prevent shrinking */
+         }
+         #shortsList .short-actions {
+             margin-top: 10px;
+             display: flex;
+             flex-wrap: wrap;
+             gap: 8px;
+             padding-top: 10px;
+             border-top: 1px dashed var(--border-color);
+         }
+         #shortsList .short-actions button {
+             margin: 0;
+             padding: 6px 10px;
+             font-size: 0.9em;
+         }
+         /* Button added dynamically for suggesting more */
+         #shortsList > button {
+             margin-top: 15px;
          }
 
-         /* Optional: Style for subtitle input */
-         #uploadForm label[for="subtitle"] {
-              font-weight: normal;
-              color: #555;
-         }
+
          /* Animations */
          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
          @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* --- Responsive Adjustments --- */
+        @media (max-width: 768px) {
+            body {
+                margin: 10px; /* Reduced margin */
+                font-size: 0.95rem; /* Slightly smaller base font */
+            }
+
+            h1 { font-size: 1.6rem; }
+            h2 { font-size: 1.3rem; }
+
+            #uploadSection, #videosTableContainer {
+                 padding: 15px; /* Reduced padding */
+                 margin-bottom: 20px;
+            }
+
+            input[type="file"], input[type="text"], button {
+                 padding: 8px 12px; /* Slightly reduce padding */
+                 font-size: 0.95rem;
+            }
+
+            /* Table adjustments */
+            #videosTable th, #videosTable td {
+                 padding: 8px; /* Reduced cell padding */
+            }
+             /* Example: Adjust specific columns if needed, e.g., make ID column smaller */
+             #videosTable th:nth-child(1), #videosTable td:nth-child(1) { width: auto; font-size: 0.85em; } /* Let ID shrink */
+             #videosTable th:nth-child(3), #videosTable td:nth-child(3), /* Play */
+             #videosTable th:nth-child(4), #videosTable td:nth-child(4) { width: auto; } /* Shorts */
+             /* Give more space to Details and Actions */
+             #videosTable th:nth-child(2), #videosTable td:nth-child(2) { min-width: 120px; } /* Details */
+             #videosTable th:nth-child(5), #videosTable td:nth-child(5) { min-width: 200px; } /* Actions */
+
+
+            #videosTable td .button-group {
+                 gap: 5px; /* Slightly reduce gap */
+            }
+            #videosTable td .button-group button {
+                 padding: 5px 8px;
+                 font-size: 0.85em;
+            }
+             .subtitle-upload-form {
+                  gap: 5px;
+             }
+             .subtitle-upload-form input[type="file"] {
+                  min-width: 120px; /* Adjust min-width if needed */
+             }
+             .subtitle-upload-form button {
+                 padding: 5px 8px;
+                 font-size: 0.85em;
+             }
+
+
+            /* Modal adjustments */
+            .modal-content {
+                padding: 20px; /* Reduce modal padding */
+                margin: 10% auto; /* Adjust vertical margin */
+            }
+
+            /* Shorts List inside modal */
+            #shortsList .short-item {
+                padding: 10px;
+            }
+            #shortsList .short-time { gap: 5px; }
+            #shortsList .short-time input[type="text"] {
+                 min-width: 65px; /* Further reduce min width */
+                 max-width: 90px;
+            }
+            #shortsList .short-actions { gap: 5px; }
+            #shortsList .short-actions button,
+            #shortsList .short-time button {
+                padding: 5px 8px;
+                font-size: 0.85em;
+            }
+
+        } /* End of media query */
+
     </style>
 </head>
 <body>
     <h1>Video Shorts Generator</h1>
 
-    <div id="uploadSection">
-        <form id="uploadForm" enctype="multipart/form-data">
-            <!-- Video File Input -->
-            <label for="video">1. Select Video File (Required):</label>
-            <input type="file" id="video" name="video" accept="video/*,.mkv,.mov,.avi,.wmv" required>
-
-            <!-- Subtitle File Input (Optional) -->
-            <label for="subtitle">2. Select Subtitle File (Optional .srt/.vtt):</label>
-            <input type="file" id="subtitle" name="subtitle" accept=".srt,.vtt">
-
-            <button type="submit">Upload & Process</button>
-        </form>
-        <div id="uploadStatus" class="status"></div>
+    <!-- Added container div for upload section styling -->
+    <div id="uploadSectionContainer">
+        <div id="uploadSection">
+             <h2>Upload New Video</h2>
+             <form id="uploadForm" enctype="multipart/form-data">
+                 <div>
+                     <label for="video">1. Select Video File (Required):</label>
+                     <input type="file" id="video" name="video" accept="video/*,.mkv,.mov,.avi,.wmv" required>
+                 </div>
+                 <div>
+                     <label for="subtitle">2. Select Subtitle File (Optional .srt/.vtt):</label>
+                     <input type="file" id="subtitle" name="subtitle" accept=".srt,.vtt">
+                 </div>
+                 <button type="submit">Upload & Process</button>
+             </form>
+             <div id="uploadStatus" class="status"></div>
+         </div>
     </div>
 
-    <hr>
 
-    <h2>Manage Videos</h2>
-    <div id="listStatus" class="status"></div>
+    <!-- Removed HR, using section spacing instead -->
+    <!-- <hr> -->
+
+    <!-- Added container div for table section styling -->
     <div id="videosTableContainer">
+        <h2>Manage Videos</h2>
+        <div id="listStatus" class="status"></div>
+        <!-- Table itself is inside -->
         <table id="videosTable">
             <thead>
                 <tr>
@@ -185,17 +419,19 @@
     <!-- Shorts Modal -->
     <div id="shortsModal" class="modal">
         <div class="modal-content" id="shortsModalContent">
-            <button class="close-button" onclick="closeShortsModal()" aria-label="Close">&times;</button>
+            <button class="close-button" onclick="closeShortsModal()" aria-label="Close Modal">×</button>
             <h3 id="shortsModalTitle">Shorts</h3>
              <div id="shortsModalStatus" class="status"></div>
-            <div id="shortsList"></div>
+            <div id="shortsList">
+                 <!-- Short items will be inserted here -->
+            </div>
         </div>
     </div>
 
     <!-- Video Player Modal -->
     <div id="videoModal" class="modal">
         <div class="modal-content" id="videoModalContent">
-            <button class="close-button" onclick="closeVideoModal()" aria-label="Close">&times;</button>
+            <button class="close-button" onclick="closeVideoModal()" aria-label="Close Player">×</button>
              <h4 id="videoModalTitle" style='margin-top:0; margin-bottom: 10px;'>Video Player</h4>
             <video id="modalVideo" controls controlsList="nodownload"></video> <!-- Added controlsList -->
         </div>
@@ -206,7 +442,7 @@
         let videosData = {};
         // Track modal state and refresh interval
         let currentModalVideoId = null;
-        let refreshIntervalId = null; // Use ID for clarity
+        let refreshIntervalId = null; // Interval ID for clearing
         const REFRESH_INTERVAL_MS = 7000; // Refresh every 7 seconds
 
         // --- Utility Functions ---
@@ -219,14 +455,24 @@
             let statusClass = 'status-info'; // Default info style
             if (isError) {
                 statusClass = 'status-failed';
-            } else if (message.toLowerCase().includes('processing') || message.toLowerCase().includes('queued')) {
+            } else if (!message) { // Clear status
+                statusClass = '';
+            } else if (message.toLowerCase().includes('processing') || message.toLowerCase().includes('queued') || message.toLowerCase().includes('refreshing') || message.toLowerCase().includes('waiting') || message.toLowerCase().includes('started') || message.toLowerCase().includes('uploading')) {
                  statusClass = 'status-processing';
-            } else if (message.toLowerCase().includes('complete') || message.toLowerCase().includes('success')) {
+            } else if (message.toLowerCase().includes('complete') || message.toLowerCase().includes('success') || message.toLowerCase().includes('loaded') || message.toLowerCase().includes('uploaded') || message.toLowerCase().includes('updated') || message.toLowerCase().includes('deleted')) {
                  statusClass = 'status-completed';
+            } else if (message.toLowerCase().includes('pending_reprocess')) {
+                 statusClass = 'status-pending_reprocess';
+            } else if (message.toLowerCase().includes('pending')) {
+                 statusClass = 'status-pending';
             }
+            // Add other keywords if needed
+
             // Reset classes and add the determined status class
-            element.className = 'status'; // Reset base class
-            element.classList.add(statusClass);
+            element.className = 'status'; // Reset to base class first
+            if(statusClass) {
+                element.classList.add(statusClass);
+            }
 
             // Clear status after a delay (if duration > 0)
             if (message && duration > 0) {
@@ -237,6 +483,10 @@
                         element.className = 'status'; // Reset class
                     }
                 }, duration);
+            } else if (!message) {
+                 // If message is empty, clear immediately and reset class
+                 element.textContent = '';
+                 element.className = 'status';
             }
         }
 
@@ -261,42 +511,56 @@
 
         // --- API Fetch Functions ---
         async function fetchWithCacheBust(url, options = {}) {
+             // Add cache-busting query parameter
              const separator = url.includes('?') ? '&' : '?';
-             const cacheBustedUrl = `${url}${separator}t=${new Date().getTime()}`;
-             return fetch(cacheBustedUrl, options);
+             const cacheBustedUrl = `${url}${separator}_=${new Date().getTime()}`; // Use underscore for convention
+             try {
+                 const response = await fetch(cacheBustedUrl, options);
+                 // No explicit error handling here, let caller handle non-ok responses
+                 return response;
+             } catch (networkError) {
+                 console.error('Network error fetching:', url, networkError);
+                 // Rethrow or handle as appropriate for the caller
+                 throw new Error(`Network error: ${networkError.message}`);
+             }
         }
 
         async function fetchVideos() {
-            setStatus('listStatus', 'Loading videos...');
+            setStatus('listStatus', 'Loading videos...', false, 0); // Persistent until loaded or error
             try {
                 const response = await fetchWithCacheBust('/videos');
                 if (!response.ok) {
+                    // Try to parse error JSON, fallback to status text
                     const errorData = await response.json().catch(() => ({ error: `HTTP error! Status: ${response.status}` }));
                     throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
                 }
                 const videos = await response.json();
-                setStatus('listStatus', `Loaded ${videos.length} videos.`);
+                setStatus('listStatus', `Loaded ${videos.length} videos.`, false, 5000); // Success message disappears
                 return videos;
             } catch (error) {
                 console.error('Error loading videos:', error);
-                setStatus('listStatus', `Error loading videos: ${error.message}`, true);
-                return [];
+                setStatus('listStatus', `Error loading videos: ${error.message}`, true, 0); // Persistent error
+                return []; // Return empty array on error
             }
         }
 
         async function fetchShortsForVideo(videoId) {
-             // No persistent status needed here, modal status handles it
+             // Using shortsModalStatus for feedback during modal operations
              console.log(`Fetching shorts for video ${videoId}`);
+             setStatus('shortsModalStatus', 'Refreshing shorts...', false, 0); // Indicate loading
              try {
                 const response = await fetchWithCacheBust(`/videos/${videoId}/shorts`);
                 if (!response.ok) {
+                     // Try to parse error JSON, fallback to status text
                      const errorData = await response.json().catch(() => ({ error: `HTTP error! Status: ${response.status}` }));
                      throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
                 }
-                return await response.json();
+                 const shorts = await response.json();
+                 setStatus('shortsModalStatus', ''); // Clear status on success
+                 return shorts;
              } catch (error) {
                  console.error(`Error loading shorts for video ${videoId}:`, error);
-                 setStatus('shortsModalStatus', `Error refreshing shorts: ${error.message}`, true);
+                 setStatus('shortsModalStatus', `Error refreshing shorts: ${error.message}`, true, 0); // Persistent error
                  // Return cached data if available, otherwise empty
                  return videosData[videoId]?.shorts || [];
              }
@@ -305,62 +569,82 @@
         // --- UI Rendering ---
         function renderVideosTable(videos) {
             const tbody = document.querySelector('#videosTable tbody');
-            tbody.innerHTML = '';
+            tbody.innerHTML = ''; // Clear existing rows
             videosData = {}; // Reset local cache
 
             if (!videos || videos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5">No videos found. Upload a video to get started.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; font-style: italic;">No videos found. Upload a video to get started.</td></tr>';
                 return;
             }
 
+            // Sort videos by ID descending (newest first) - optional
+            videos.sort((a, b) => b.id - a.id);
+
             videos.forEach(video => {
-                videosData[video.id] = video; // Store video data by ID
+                videosData[video.id] = video; // Store/update video data by ID
                 const row = document.createElement('tr');
                 row.dataset.videoId = video.id;
 
-                // Determine states
+                // Determine states for button logic
                 const isCompleted = video.status === 'completed';
                 const isProcessing = ['processing', 'pending', 'queued', 'pending_reprocess'].includes(video.status);
                 const isFailed = video.status === 'failed';
                 const hasUploadedSubs = !!video.uploaded_subtitle_filename;
-                const hasShorts = video.shorts && video.shorts.length > 0;
-                // New: Check if there's content suitable for suggestions (from backend flag)
+                // Ensure shorts is an array before checking length
+                const shortsArray = Array.isArray(video.shorts) ? video.shorts : [];
+                const hasShorts = shortsArray.length > 0;
+                // Use the backend flag for suggestibility
                 const hasSuggestibleContent = video.has_subtitle_content === true;
 
-                // Shorts Button Logic
+                // --- Shorts Button Logic ---
                 let shortsButtonText = 'Manage Shorts';
-                let shortsButtonDisabled = !isCompleted;
+                let shortsButtonDisabled = !isCompleted; // Disabled if not completed
                 let shortsButtonTitle = isCompleted ? 'View, manage, or suggest shorts' : 'Video processing must be complete';
+                let shortsButtonSmallText = ''; // Additional text below button
+
                 if (isCompleted) {
                     if (hasShorts) {
-                        shortsButtonText = `View ${video.shorts.length} Shorts`;
-                    } else if (hasSuggestibleContent) { // Suggest if content exists, regardless of source
+                        shortsButtonText = `View ${shortsArray.length} Shorts`;
+                    } else if (hasSuggestibleContent) {
                         shortsButtonText = 'Suggest Shorts';
-                        shortsButtonTitle = 'Generate short suggestions using AI based on available subtitles';
+                        shortsButtonTitle = 'Generate short suggestions based on available subtitles';
+                        shortsButtonSmallText = '(Click to suggest)';
                     } else {
-                        shortsButtonText = 'View Shorts'; // No shorts and no content to suggest from
-                        shortsButtonTitle = 'View shorts (No content found to suggest new ones)';
+                        shortsButtonText = 'View Shorts'; // No shorts & no content
+                        shortsButtonTitle = 'View shorts (No subtitle content found to suggest new ones)';
+                        shortsButtonSmallText = '(No shorts/content)';
                     }
+                } else if (isProcessing) {
+                     shortsButtonTitle = `Cannot manage shorts while status is ${video.status}`;
+                } else if (isFailed) {
+                     shortsButtonTitle = 'Video processing failed, cannot manage shorts';
                 }
 
-                // Action Buttons Visibility/State
-                const canPerformActions = isCompleted || isFailed; // Allow some actions even on failure (like delete, maybe reprocess)
-                const canReprocess = isCompleted || isFailed; // Allow reprocess after completion or failure
-                const canReprocessWithSubs = canReprocess && hasUploadedSubs;
-                const canReprocessSuggestions = isCompleted && hasSuggestibleContent;
-                const canUploadSubs = !isProcessing; // Can upload subs unless actively processing
+                // --- Action Buttons Visibility/State ---
+                const canPerformActions = isCompleted || isFailed; // Allow delete/reprocess on completion or failure
+                const canReprocess = isCompleted || isFailed;
+                const canReprocessWithSubs = canReprocess && hasUploadedSubs; // Need uploaded subs
+                const canReprocessSuggestions = isCompleted && hasSuggestibleContent; // Need completion and content
+                const canUploadSubs = !isProcessing; // Can upload unless actively processing
 
+                // --- Build Row HTML ---
                 row.innerHTML = `
                     <td>${video.id}</td>
                     <td>
-                        <strong>${video.title || 'Untitled'}</strong><br>
-                        <small>${video.original_filename}</small><br>
+                        <strong>${video.title || 'Untitled Video'}</strong><br>
+                        <small title="${video.original_filename}">Filename: ${video.original_filename}</small><br>
                         Status: <strong class="${getVideoStatusClass(video.status)}">${video.status}</strong>
-                        ${hasUploadedSubs ? `<br><small title="${video.uploaded_subtitle_filename}">Using Subs: ${video.uploaded_subtitle_filename.substring(0, 20)}...</small>` : ''}
-                        ${!hasUploadedSubs && video.status === 'completed' && video.has_subtitle_content ? `<br><small>Using Generated Subs</small>` : ''}
+                        ${hasUploadedSubs
+                            ? `<br><small title="Using uploaded subtitle: ${video.uploaded_subtitle_filename}">Using Subs: ${video.uploaded_subtitle_filename.substring(0, 20)}${video.uploaded_subtitle_filename.length > 20 ? '...' : ''}</small>`
+                            : ''}
+                        ${!hasUploadedSubs && video.status === 'completed' && video.has_subtitle_content
+                            ? `<br><small>Using Generated Subs</small>`
+                            : ''}
+                         ${video.status === 'failed' && video.error_message
+                            ? `<br><small style="color: var(--danger-color);">Error: ${video.error_message}</small>` : ''}
                     </td>
                     <td style="text-align: center;">
-                        <button onclick="playVideo('${video.edited_video_url}', 'Full Video: ${video.title}')" ${!video.edited_video_url ? 'disabled' : ''} title="${video.edited_video_url ? 'Play the full edited video' : 'Video not available'}">
+                        <button onclick="playVideo('${video.edited_video_url}', 'Full Video: ${video.title || video.original_filename}')" ${!video.edited_video_url || isProcessing ? 'disabled' : ''} title="${video.edited_video_url && !isProcessing ? 'Play the full edited video' : (isProcessing ? 'Video processing' : 'Video not available')}">
                             Play Full
                         </button>
                     </td>
@@ -368,22 +652,20 @@
                         <button onclick="showShorts(${video.id})" ${shortsButtonDisabled} title="${shortsButtonTitle}">
                             ${shortsButtonText}
                         </button>
-                        ${isCompleted && !hasShorts && hasSuggestibleContent ? `<br><small>(Click to suggest)</small>` : ''}
-                        ${isCompleted && !hasShorts && !hasSuggestibleContent ? `<br><small>(No shorts/content)</small>` : ''}
+                        ${shortsButtonSmallText ? `<br><small>${shortsButtonSmallText}</small>` : ''}
                     </td>
                     <td>
                          <div class="button-group">
                             <button class="danger" onclick="deleteVideo(${video.id})" title="Delete video and all related files">Delete</button>
-                            <!-- New Buttons -->
-                            <button onclick="reprocessSuggestions(${video.id})" ${!canReprocessSuggestions ? 'disabled' : ''} title="${canReprocessSuggestions ? 'Generate new short suggestions using the current subtitle content' : 'Cannot regenerate suggestions (video not complete or no subtitle content)'}">Reprocess Suggestions</button>
-                            <button onclick="reprocessAllAutoDetect(${video.id})" ${!canReprocess ? 'disabled' : ''} title="${canReprocess ? 'Re-process video, subtitles (using uploaded if present, else generate), and suggestions' : 'Cannot reprocess video in current state'}">Reprocess All (Auto-Detect Subs)</button>
-                            <button onclick="triggerReprocessWithSubs(${video.id})" ${!canReprocessWithSubs ? 'disabled' : ''} title="${canReprocessWithSubs ? 'Force re-processing video using the uploaded subtitle file' : 'Cannot force reprocess with subs (video state or no uploaded subs)'}">Reprocess All (Force Use Subs)</button>
+                            <button onclick="reprocessSuggestions(${video.id})" ${!canReprocessSuggestions ? 'disabled' : ''} title="${canReprocessSuggestions ? 'Generate new short suggestions using current subtitle content' : 'Requires completed video with subtitle content'}">Regen Suggestions</button>
+                            <button onclick="reprocessAllAutoDetect(${video.id})" ${!canReprocess ? 'disabled' : ''} title="${canReprocess ? 'Re-process all: Subtitles (auto), video edit, suggestions' : 'Cannot reprocess in current state'}">Reprocess All (Auto)</button>
+                            <button onclick="triggerReprocessWithSubs(${video.id})" ${!canReprocessWithSubs ? 'disabled' : ''} title="${canReprocessWithSubs ? 'Force re-process all using the previously uploaded subtitle file' : 'Requires uploaded subs & completed/failed state'}">Reprocess All (Use Subs)</button>
                          </div>
                         <!-- Subtitle Upload Form -->
                         <form class="subtitle-upload-form" data-video-id="${video.id}" onsubmit="uploadExistingVideoSubtitle(event)">
                             <label for="subtitle-upload-${video.id}">New Subs:</label>
-                            <input type="file" id="subtitle-upload-${video.id}" name="subtitle" accept=".srt,.vtt" ${!canUploadSubs ? 'disabled' : ''} title="Upload new SRT/VTT (replaces existing, triggers reprocessing)">
-                            <button type="submit" ${!canUploadSubs ? 'disabled' : ''} title="Upload new SRT/VTT">Upload</button>
+                            <input type="file" id="subtitle-upload-${video.id}" name="subtitle" accept=".srt,.vtt" ${!canUploadSubs ? 'disabled' : ''} title="${canUploadSubs ? 'Upload new SRT/VTT (replaces existing, triggers reprocessing)' : 'Cannot upload subs while processing'}">
+                            <button type="submit" ${!canUploadSubs ? 'disabled' : ''} title="Upload and reprocess with new subtitles">Upload Subs</button>
                         </form>
                     </td>
                 `;
@@ -391,95 +673,118 @@
             });
         }
 
-        // Debounced version of loadAndRenderVideos for refresh calls
-        const debouncedLoadAndRender = debounce(loadAndRenderVideos, 500);
+        // Debounced version for refresh calls to avoid rapid re-renders
+        const debouncedLoadAndRender = debounce(loadAndRenderVideos, 500); // 500ms delay
 
+        // --- Main Load and Render Function ---
         async function loadAndRenderVideos() {
-             const videos = await fetchVideos();
-             renderVideosTable(videos);
+             const videos = await fetchVideos(); // Fetch latest video list
+             renderVideosTable(videos); // Render the table UI
 
-             // If a modal is open, check if its video data needs updating
+             // --- Handle Modal Refresh Logic ---
              if (currentModalVideoId && videosData[currentModalVideoId]) {
-                 const video = videosData[currentModalVideoId];
-                 // Update modal status display if video is processing
-                 if (['processing', 'pending_reprocess', 'queued'].includes(video.status)) {
-                     setStatus('shortsModalStatus', `Main video status: ${video.status}. Waiting...`, false, 0);
-                 }
-                 // If video completed *while* modal was open, fetch and update shorts
-                 else if (video.status === 'completed') {
-                      // Check if shorts need fetching (e.g., if previously empty or processing, or if suggestible content appeared)
-                      const shortsNeedUpdate = !video.shorts || video.shorts.length === 0 || video.shorts.some(s => ['queued', 'processing'].includes(s.status));
-                      const suggestibleNow = video.has_subtitle_content && (!video.shorts || video.shorts.length === 0); // Suggestible content exists but no shorts yet
+                 // If a shorts modal is open and its video still exists
+                 const video = videosData[currentModalVideoId]; // Get updated data for the modal's video
+
+                 // Update modal status based on the main video's status
+                 if (isProcessingStatus(video.status)) {
+                      setStatus('shortsModalStatus', `Main video status: ${video.status}. Waiting...`, false, 0);
+                 } else if (video.status === 'failed') {
+                      setStatus('shortsModalStatus', `Main video processing failed. ${video.error_message || ''}`, true, 0);
+                 } else if (video.status === 'completed') {
+                      // Video completed. Check if shorts need updating within the modal.
+                      const shortsNeedUpdate = shouldRefreshShorts(video.shorts); // Check if any short is processing/queued
+                      const suggestibleNow = video.has_subtitle_content && (!video.shorts || video.shorts.length === 0);
 
                       if (shortsNeedUpdate || suggestibleNow) {
-                           setStatus('shortsModalStatus', 'Refreshing shorts list...');
-                           const shorts = await fetchShortsForVideo(currentModalVideoId);
-                           videosData[currentModalVideoId].shorts = shorts;
-                           updateShortsModal(currentModalVideoId);
-                           setStatus('shortsModalStatus', ''); // Clear after update
+                           console.log(`Modal video ${currentModalVideoId} completed or shorts processing, refreshing shorts list.`);
+                           const shorts = await fetchShortsForVideo(currentModalVideoId); // Fetch updated shorts
+                           videosData[currentModalVideoId].shorts = shorts; // Update local cache
+                           updateShortsModal(currentModalVideoId); // Re-render the modal content
+                           // Status is cleared by fetchShortsForVideo on success
                       } else {
-                           // Ensure status message is cleared if process completed and no update needed
-                           setStatus('shortsModalStatus', '');
+                           // If processing finished and no shorts needed update, ensure status is clear
+                           const statusElement = document.getElementById('shortsModalStatus');
+                           if (statusElement && statusElement.textContent.includes('Waiting')) {
+                                setStatus('shortsModalStatus', ''); // Clear "Waiting..." message
+                           }
                       }
-                 } else if (video.status === 'failed') {
-                     setStatus('shortsModalStatus', `Main video processing failed.`, true, 0);
                  }
              } else if (currentModalVideoId && !videosData[currentModalVideoId]) {
-                 // If the video for the open modal was deleted/removed
+                 // If the video for the open modal was deleted/removed from the list
+                 console.warn(`Video ${currentModalVideoId} for open modal not found in latest fetch. Closing modal.`);
                  closeShortsModal();
              }
+        }
+
+        // Helper to check if a video status indicates processing
+        function isProcessingStatus(status) {
+            return ['processing', 'pending', 'queued', 'pending_reprocess'].includes(status);
+        }
+
+        // Helper to check if shorts list contains items needing refresh
+        function shouldRefreshShorts(shorts) {
+            if (!Array.isArray(shorts)) return false;
+            return shorts.some(short => isProcessingStatus(short.status));
         }
 
 
         // --- Event Handlers & Actions ---
 
+        // Initial Upload Form Submission
         document.getElementById('uploadForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const formData = new FormData();
             const videoFile = document.getElementById('video').files[0];
-            const subtitleFile = document.getElementById('subtitle').files[0]; // Get optional subtitle file
+            const subtitleFile = document.getElementById('subtitle').files[0];
             const submitButton = e.target.querySelector('button[type="submit"]');
+            const uploadStatusEl = document.getElementById('uploadStatus');
 
             if (!videoFile) {
-                setStatus('uploadStatus', 'Please select a video file.', true);
+                setStatus('uploadStatus', 'Please select a video file.', true, 5000);
                 return;
             }
 
             formData.append('video', videoFile);
+            let statusMsg = 'Uploading video...';
 
-            // Append subtitle file IF selected
             if (subtitleFile) {
-                // Optional: Basic client-side extension check
                 const allowedExtensions = /(\.srt|\.vtt)$/i;
                 if (!allowedExtensions.exec(subtitleFile.name)) {
-                    setStatus('uploadStatus', 'Invalid subtitle file type. Please use SRT or VTT.', true);
+                    setStatus('uploadStatus', 'Invalid subtitle file type. Please use SRT or VTT.', true, 5000);
                     return;
                 }
                 formData.append('subtitle', subtitleFile);
-                setStatus('uploadStatus', 'Uploading video and subtitle...', false, 0);
-            } else {
-                setStatus('uploadStatus', 'Uploading video...', false, 0);
+                statusMsg = 'Uploading video and subtitle...';
             }
 
-            submitButton.disabled = true; // Disable button during upload
+            setStatus('uploadStatus', statusMsg, false, 0); // Persistent status during upload
+            submitButton.disabled = true; // Disable button
 
             try {
-                const response = await fetch('/upload', { method: 'POST', body: formData });
+                // Use fetchWithCacheBust for consistency, though cache less critical for POST
+                const response = await fetchWithCacheBust('/upload', { method: 'POST', body: formData });
                 const data = await response.json();
+
                 if (!response.ok) {
+                    // Throw error with message from backend if available
                     throw new Error(data.error || `Upload failed with status ${response.status}`);
                 }
+                // Success message, will disappear after duration
                 setStatus('uploadStatus', data.message || `Processing started for video ${data.video_id}...`, false, 10000);
                 e.target.reset(); // Clear file inputs on success
-                setTimeout(loadAndRenderVideos, 2000); // Refresh videos list sooner
+                setTimeout(loadAndRenderVideos, 1500); // Refresh videos list slightly sooner after upload starts
+
             } catch (error) {
+                // Persistent error message
                 setStatus('uploadStatus', `Upload failed: ${error.message}`, true, 0);
-                console.error(error);
+                console.error('Upload error:', error);
             } finally {
-                submitButton.disabled = false;
+                submitButton.disabled = false; // Re-enable button
             }
         });
 
+        // Subtitle Upload for Existing Video
         async function uploadExistingVideoSubtitle(event) {
             event.preventDefault();
             const form = event.target;
@@ -487,134 +792,139 @@
             const fileInput = form.querySelector('input[name="subtitle"]');
             const submitButton = form.querySelector('button[type="submit"]');
             const file = fileInput.files[0];
-            const statusElementId = 'listStatus'; // Use main list status
+            const statusElementId = 'listStatus'; // Use main list status for this action
 
             if (!file) {
-                setStatus(statusElementId, `Please select an SRT or VTT file for video ${videoId}.`, true);
+                setStatus(statusElementId, `Please select an SRT or VTT file for video ${videoId}.`, true, 5000);
                 return;
             }
             const allowedExtensions = /(\.srt|\.vtt)$/i;
             if (!allowedExtensions.exec(file.name)) {
-                setStatus(statusElementId, 'Invalid file type. Please upload an SRT or VTT file.', true);
+                setStatus(statusElementId, 'Invalid file type. Please upload an SRT or VTT file.', true, 5000);
                 return;
             }
 
             const formData = new FormData();
             formData.append('subtitle', file);
-            setStatus(statusElementId, `Uploading subtitle for video ${videoId}...`, false, 0);
+            setStatus(statusElementId, `Uploading subtitle for video ${videoId}...`, false, 0); // Persistent status
             submitButton.disabled = true;
             fileInput.disabled = true;
 
             try {
-                // Use the dedicated endpoint for existing videos
-                const response = await fetch(`/videos/${videoId}/upload_subtitle`, { method: 'POST', body: formData });
+                const response = await fetchWithCacheBust(`/videos/${videoId}/upload_subtitle`, { method: 'POST', body: formData });
                 const data = await response.json();
                 if (!response.ok) {
                     throw new Error(data.error || `Subtitle upload failed with status ${response.status}`);
                 }
                 setStatus(statusElementId, data.message || `Subtitle uploaded for video ${videoId}. Reprocessing...`, false, 10000);
                 fileInput.value = ''; // Clear file input on success
-                setTimeout(loadAndRenderVideos, 2000); // Refresh list to show pending_reprocess status
+                setTimeout(loadAndRenderVideos, 1500); // Refresh list to show status change
+
             } catch (error) {
-                setStatus(statusElementId, `Subtitle upload failed: ${error.message}`, true, 0);
-                console.error(error);
-            } finally {
-                // Re-enable based on latest video status fetched
-                 setTimeout(async () => {
-                      await loadAndRenderVideos(); // Ensure latest state determines button enable/disable
-                 }, 1000);
+                setStatus(statusElementId, `Subtitle upload failed: ${error.message}`, true, 0); // Persistent error
+                console.error('Subtitle upload error:', error);
+                 // Re-enable buttons after error in case it was temporary
+                 submitButton.disabled = false;
+                 fileInput.disabled = false;
             }
+            // No finally block needed here as we want buttons enabled only on error or after refresh confirms state.
+            // Refresh triggered above will handle re-enabling based on actual video status.
         }
 
-        // Handles "Reprocess All (Force Use Subs)" button
+        // Trigger "Reprocess All (Force Use Subs)"
         async function triggerReprocessWithSubs(videoId) {
              const video = videosData[videoId];
              if (!video || !video.uploaded_subtitle_filename) {
-                 setStatus('listStatus', 'No uploaded subtitle found for this video.', true);
+                 setStatus('listStatus', 'No uploaded subtitle found to force reprocess with.', true, 5000);
                  return;
              }
-              // Allow reprocess from completed or failed states
              if (!['completed', 'failed'].includes(video.status)) {
-                  setStatus('listStatus', `Video status is ${video.status}. Cannot start reprocessing now. Wait for completion or failure.`, true);
+                  setStatus('listStatus', `Video must be 'completed' or 'failed' to trigger reprocess. Current: ${video.status}.`, true, 5000);
                   return;
              }
 
-             if (!confirm(`Force re-processing video ${videoId} using subtitle:\n${video.uploaded_subtitle_filename}\n\nThis will re-edit the video and regenerate suggestions.\nContinue?`)) return;
+             if (!confirm(`Force re-processing video ${videoId} using subtitle:\n${video.uploaded_subtitle_filename}\n\nThis will overwrite the edited video and regenerate suggestions.\nContinue?`)) return;
 
-             setStatus('listStatus', `Requesting reprocess (forcing subs) for video ${videoId}...`, false, 0);
+             setStatus('listStatus', `Requesting reprocess (using subs) for video ${videoId}...`, false, 0);
+             // Disable relevant buttons on the row temporarily
+             const row = document.querySelector(`tr[data-video-id="${videoId}"]`);
+             const buttons = row ? row.querySelectorAll('button') : [];
+             buttons.forEach(btn => btn.disabled = true);
+
              try {
-                 // Use the dedicated trigger endpoint added in app.py
-                 const response = await fetch(`/videos/${videoId}/reprocess_with_subtitle_trigger`, { method: 'POST' });
+                 const response = await fetchWithCacheBust(`/videos/${videoId}/reprocess_with_subtitle_trigger`, { method: 'POST' });
                  const data = await response.json();
                  if (!response.ok) {
                      throw new Error(data.error || 'Failed to trigger reprocess');
                  }
-                 setStatus('listStatus', data.message || `Reprocessing started for video ${videoId}.`, false, 10000);
-                 setTimeout(loadAndRenderVideos, 2000); // Refresh list to show status change
+                 setStatus('listStatus', data.message || `Reprocessing (using subs) started for video ${videoId}.`, false, 10000);
+                 setTimeout(loadAndRenderVideos, 1500); // Refresh list soon
 
              } catch (error) {
                  setStatus('listStatus', `Failed to trigger reprocess: ${error.message}`, true, 0); // Persistent error
-                 console.error('Error triggering reprocess:', error);
+                 console.error('Error triggering reprocess with subs:', error);
+                 // Re-enable buttons on error
+                 buttons.forEach(btn => btn.disabled = false); // Simple re-enable, refresh will correct state later
              }
         }
 
-        // --- New JS Functions for Reprocess Buttons ---
-
-        // Handles "Reprocess Suggestions" button
+        // Trigger "Reprocess Suggestions"
         async function reprocessSuggestions(videoId) {
              const video = videosData[videoId];
              if (!video) return;
 
              if (video.status !== 'completed') {
-                 setStatus('listStatus', `Video status is ${video.status}. Suggestions can only be regenerated when complete.`, true);
+                 setStatus('listStatus', `Video status is ${video.status}. Suggestions require 'completed' status.`, true, 5000);
                  return;
              }
-              if (!video.has_subtitle_content) {
-                  setStatus('listStatus', 'No subtitle content found for this video. Cannot regenerate suggestions.', true);
+             if (!video.has_subtitle_content) {
+                  setStatus('listStatus', 'No subtitle content found for this video. Cannot regenerate suggestions.', true, 5000);
                   return;
-              }
+             }
 
              const confirmMessage = 'Regenerate short suggestions using the current subtitle content?\nExisting pending/failed suggestions will be replaced. Completed shorts remain.';
              if (!confirm(confirmMessage)) return;
 
              setStatus('listStatus', `Requesting suggestion regeneration for video ${videoId}...`, false, 0);
+             const button = event.target; // Get the button that was clicked
+             if (button) button.disabled = true;
+
              try {
-                 // Calls the '/refresh' endpoint which now triggers suggestion regeneration
-                 const response = await fetch(`/videos/${videoId}/refresh`, { method: 'POST' });
+                 // Use the '/refresh' endpoint for suggestion regeneration
+                 const response = await fetchWithCacheBust(`/videos/${videoId}/refresh`, { method: 'POST' });
                  const data = await response.json();
                  if (!response.ok) {
                      throw new Error(data.error || 'Failed to start suggestion regeneration.');
                  }
                  setStatus('listStatus', data.message || `Suggestion regeneration started for video ${videoId}.`, false, 10000);
-                 // Refresh list after a delay to allow backend processing to start
+
+                 // Refresh list AND modal content after a delay
                  setTimeout(async () => {
-                      await loadAndRenderVideos();
-                      // If modal was open, refresh its content specifically
-                      if (currentModalVideoId === videoId) {
-                           setStatus('shortsModalStatus', 'Refreshing suggestions...');
-                           const shorts = await fetchShortsForVideo(videoId);
-                           videosData[videoId].shorts = shorts;
-                           updateShortsModal(videoId);
-                           setStatus('shortsModalStatus', '');
+                      await loadAndRenderVideos(); // Refresh main list
+                      if (currentModalVideoId === videoId) { // If modal is open for this video
+                           console.log(`Modal open for video ${videoId}, refreshing its content after suggestion request.`);
+                           const shorts = await fetchShortsForVideo(videoId); // Fetch fresh shorts
+                           videosData[videoId].shorts = shorts; // Update cache
+                           updateShortsModal(videoId); // Update modal UI
                       }
-                 }, REFRESH_INTERVAL_MS); // Wait longer for suggestions
+                 }, REFRESH_INTERVAL_MS); // Wait a bit longer for suggestions task to potentially start
 
              } catch (error) {
                  setStatus('listStatus', `Error regenerating suggestions: ${error.message}`, true, 0); // Persistent error
                  console.error('Error regenerating suggestions:', error);
+                 if (button) button.disabled = false; // Re-enable on error
              }
          }
 
-         // Handles "Reprocess All (Auto-Detect Subs)" button
+         // Trigger "Reprocess All (Auto-Detect Subs)"
          async function reprocessAllAutoDetect(videoId) {
               const video = videosData[videoId];
               if (!video) return;
 
-              // Allow reprocess from completed or failed states
-             if (!['completed', 'failed'].includes(video.status)) {
-                  setStatus('listStatus', `Video status is ${video.status}. Cannot start reprocessing now. Wait for completion or failure.`, true);
+              if (!['completed', 'failed'].includes(video.status)) {
+                  setStatus('listStatus', `Video must be 'completed' or 'failed' to reprocess. Current: ${video.status}.`, true, 5000);
                   return;
-             }
+              }
 
               const subtitleSourceMessage = video.uploaded_subtitle_filename
                   ? `using uploaded subtitle: ${video.uploaded_subtitle_filename}`
@@ -624,224 +934,272 @@
               if (!confirm(confirmMessage)) return;
 
               setStatus('listStatus', `Requesting full reprocessing for video ${videoId}...`, false, 0);
+              const button = event.target;
+              if (button) button.disabled = true;
+
               try {
-                  // Call the new endpoint for full reprocessing with auto-detect
-                  const response = await fetch(`/videos/${videoId}/reprocess_subtitles`, { method: 'POST' });
+                  const response = await fetchWithCacheBust(`/videos/${videoId}/reprocess_subtitles`, { method: 'POST' });
                   const data = await response.json();
                   if (!response.ok) {
                       throw new Error(data.error || 'Failed to trigger full reprocess.');
                   }
                   setStatus('listStatus', data.message || `Full reprocessing started for video ${videoId}.`, false, 10000);
-                  setTimeout(loadAndRenderVideos, 2000); // Refresh list to show status change
+                  setTimeout(loadAndRenderVideos, 1500); // Refresh list soon
 
               } catch (error) {
                   setStatus('listStatus', `Failed to trigger full reprocess: ${error.message}`, true, 0); // Persistent error
                   console.error('Error triggering full reprocess:', error);
+                  if (button) button.disabled = false; // Re-enable on error
               }
           }
 
         // --- Modal Management ---
         async function showShorts(videoId) {
             const video = videosData[videoId];
-            if (!video || video.status !== 'completed') {
-                setStatus('listStatus', 'Video must be completed to manage shorts.', true);
+            // Allow opening even if processing, but content will reflect status
+            if (!video) {
+                setStatus('listStatus', 'Video data not found.', true, 5000);
                 return;
             }
 
-            currentModalVideoId = videoId;
+            currentModalVideoId = videoId; // Track which modal is open
             document.getElementById('shortsModalTitle').textContent = `Shorts for: ${video.title || video.original_filename}`;
-            setStatus('shortsModalStatus', 'Loading shorts...');
+            setStatus('shortsModalStatus', 'Loading shorts data...', false, 0);
             document.getElementById('shortsModal').style.display = 'block';
+            document.body.style.overflow = 'hidden'; // Prevent background scroll
 
-            // Initial load into modal
+            // Initial fetch and render for the modal
             const shorts = await fetchShortsForVideo(videoId);
-            // Ensure local cache has shorts array initialized
+            // Ensure local cache has shorts array initialized if needed
             if (!videosData[videoId].shorts) videosData[videoId].shorts = [];
-            videosData[videoId].shorts = shorts; // Update cache
+            videosData[videoId].shorts = shorts; // Update cache with fetched data
             updateShortsModal(videoId); // Render modal content
+            // Status is cleared/updated by fetchShortsForVideo
 
-            // Start periodic refresh for the modal
-            clearAndSetRefreshInterval();
+            // Start periodic refresh ONLY if needed (video or shorts processing)
+            clearAndSetRefreshInterval(); // Start interval checks
         }
 
+        // --- Interval Logic ---
         function clearAndSetRefreshInterval() {
+             // Clear any existing interval
              if (refreshIntervalId) {
                  clearInterval(refreshIntervalId);
                  refreshIntervalId = null;
+                 console.log("Cleared existing modal refresh interval.");
              }
+
+             // Set a new interval ONLY if a modal is open
              if (currentModalVideoId) {
                  console.log(`Setting refresh interval for modal video ${currentModalVideoId}`);
                  refreshIntervalId = setInterval(async () => {
-                     // Ensure modal is still supposed to be open for this video
-                     if (currentModalVideoId && videosData[currentModalVideoId]) {
-                         const video = videosData[currentModalVideoId]; // Get current video data
-                         console.log(`Interval check for modal video ${currentModalVideoId}, status: ${video.status}`);
-
-                         // Only fetch shorts if video is completed
-                         if (video.status === 'completed') {
-                             // Check if any shorts are currently processing/queued OR if suggestions might appear
-                             const shortsNeedProcessingUpdate = video.shorts?.some(s => ['processing', 'queued'].includes(s.status));
-                             const suggestionsMightAppear = video.has_subtitle_content && (!video.shorts || video.shorts.length === 0);
-
-                             if (shortsNeedProcessingUpdate || suggestionsMightAppear) {
-                                 setStatus('shortsModalStatus', 'Refreshing shorts list...');
-                                 const shorts = await fetchShortsForVideo(currentModalVideoId);
-                                 videosData[currentModalVideoId].shorts = shorts; // Update cache
-                                 updateShortsModal(currentModalVideoId); // Re-render modal
-                                 setStatus('shortsModalStatus',''); // Clear status after update
-                             } else {
-                                 // If no shorts processing, clear status message if it was showing processing
-                                 const currentStatusMsg = document.getElementById('shortsModalStatus').textContent;
-                                 if (currentStatusMsg.toLowerCase().includes('refreshing') || currentStatusMsg.toLowerCase().includes('processing')) {
-                                      setStatus('shortsModalStatus', ''); // Clear if no update needed
-                                 }
-                             }
-                         } else if (['processing', 'pending_reprocess', 'queued'].includes(video.status)) {
-                              setStatus('shortsModalStatus', `Main video status: ${video.status}. Waiting...`, false, 0);
-                         } else if (video.status === 'failed') {
-                              setStatus('shortsModalStatus', `Main video processing failed.`, true, 0);
-                              // Optionally close modal or disable actions on main video failure
-                         }
-                     } else {
-                         // If modal ID changed or video removed, clear interval
-                         console.log("Modal ID changed or video removed, clearing interval.");
+                     // Double-check if the modal should still be refreshing
+                     if (!currentModalVideoId || !videosData[currentModalVideoId]) {
+                         console.log("Modal closed or video removed, stopping interval.");
                          clearInterval(refreshIntervalId);
                          refreshIntervalId = null;
+                         return;
                      }
+
+                     const video = videosData[currentModalVideoId];
+                     console.log(`Interval check: Modal video ${currentModalVideoId}, status: ${video.status}, shorts count: ${video.shorts?.length || 0}`);
+
+                     // Determine if a refresh of video/shorts data is needed
+                     const needsRefresh = isProcessingStatus(video.status) || shouldRefreshShorts(video.shorts);
+                     // Also refresh if video just completed and might now have suggestible content without shorts
+                     const justCompletedAndSuggestible = video.status === 'completed' && video.has_subtitle_content && (!video.shorts || video.shorts.length === 0);
+
+                     if (needsRefresh || justCompletedAndSuggestible) {
+                         console.log("Interval: Refresh needed, calling loadAndRenderVideos.");
+                         await loadAndRenderVideos(); // This will fetch videos and update modal if necessary
+                     } else {
+                         console.log("Interval: No refresh needed.");
+                         // Ensure status message is cleared if everything is stable/completed
+                         const statusElement = document.getElementById('shortsModalStatus');
+                         if (statusElement && (statusElement.textContent.includes('Waiting') || statusElement.textContent.includes('Refreshing'))) {
+                            setStatus('shortsModalStatus', '');
+                         }
+                         // Optional: Could stop the interval if nothing is processing anymore
+                         // clearInterval(refreshIntervalId);
+                         // refreshIntervalId = null;
+                         // console.log("Interval: Stable state reached, stopping interval.");
+                     }
+
                  }, REFRESH_INTERVAL_MS);
              } else {
                  console.log("No current modal video ID, interval not set.");
              }
         }
 
+        // --- Update Modal UI ---
         function updateShortsModal(videoId) {
              const video = videosData[videoId];
              if (!video) {
                  console.warn(`updateShortsModal called for non-existent videoId: ${videoId}`);
-                 closeShortsModal();
+                 closeShortsModal(); // Close if video data is gone
                  return;
              }
 
-             const shorts = video.shorts || [];
+             const shorts = Array.isArray(video.shorts) ? video.shorts : [];
              const shortsList = document.getElementById('shortsList');
-             shortsList.innerHTML = ''; // Clear previous list
+             shortsList.innerHTML = ''; // Clear previous list items
              const hasSuggestibleContent = video.has_subtitle_content === true;
 
-             // Handle empty shorts list
-             if (shorts.length === 0) {
-                 if (video.status === 'completed') {
-                     if (hasSuggestibleContent) {
-                         shortsList.innerHTML = `<p>No shorts suggested yet.</p><button onclick="reprocessSuggestions(${videoId})">Suggest Shorts Now</button>`;
-                     } else {
-                          shortsList.innerHTML = '<p>No shorts created yet, and no subtitle content found to generate suggestions.</p>';
-                     }
-                 } else {
-                     shortsList.innerHTML = `<p>Video status is ${video.status}. Shorts unavailable.</p>`;
-                 }
+             // --- Handle Different Video States ---
+             if (isProcessingStatus(video.status)) {
+                 shortsList.innerHTML = `<p>Main video is currently ${video.status}. Shorts management unavailable.</p>`;
+                 // Status message is handled by the interval/load function
                  return;
              }
+             if (video.status === 'failed') {
+                  shortsList.innerHTML = `<p>Main video processing failed. Shorts management unavailable.</p>`;
+                  // Status message is handled by the interval/load function
+                  return;
+             }
 
-             // Sort by start time
-             shorts.sort((a, b) => a.start_time.localeCompare(b.start_time));
+             // --- Handle Empty Shorts List (Video Completed) ---
+             if (video.status === 'completed' && shorts.length === 0) {
+                 if (hasSuggestibleContent) {
+                     // Provide button to trigger initial suggestion
+                     shortsList.innerHTML = `<p>No shorts suggested yet.</p><button onclick="reprocessSuggestions(${videoId})">Suggest Shorts Now</button>`;
+                 } else {
+                      // No content to suggest from
+                      shortsList.innerHTML = '<p>No shorts created yet, and no subtitle content found to generate suggestions.</p>';
+                 }
+                 return; // Stop here if no shorts to display
+             }
 
-             // Render each short item
+             // --- Render Shorts Items (Video Completed) ---
+             // Sort by start time for consistent order
+             shorts.sort((a, b) => {
+                 // Basic time string comparison (works for H:MM:SS)
+                 return (a.start_time || "").localeCompare(b.start_time || "");
+             });
+
              shorts.forEach(short => {
-                 const isProcessing = ['processing', 'queued'].includes(short.status);
-                 const canCreate = ['pending', 'failed'].includes(short.status);
-                 const canRecreate = ['completed', 'failed'].includes(short.status);
-                 const canPlay = short.status === 'completed' && !!short.short_url;
-                 const canUpdate = !isProcessing;
+                 const shortIsProcessing = isProcessingStatus(short.status);
+                 const shortIsCompleted = short.status === 'completed';
+                 const shortIsFailed = short.status === 'failed';
+                 const shortIsPending = short.status === 'pending'; // Initial state after suggestion
+
+                 const canCreate = shortIsPending || shortIsFailed; // Can create if pending or failed
+                 const canRecreate = shortIsCompleted || shortIsFailed; // Can recreate if completed or failed
+                 const canPlay = shortIsCompleted && !!short.short_url;
+                 const canUpdateTimes = !shortIsProcessing; // Can update times unless actively processing
 
                  const shortDiv = document.createElement('div');
-                 shortDiv.className = 'short-item'; // Add class for styling
-                 shortDiv.dataset.shortId = short.id;
+                 shortDiv.className = 'short-item';
+                 shortDiv.dataset.shortId = short.id; // Store ID for actions
+
                  shortDiv.innerHTML = `
                      <div class="short-info">
-                         <p><strong>${short.short_name || 'Unnamed Short'}</strong></p>
-                         <p><small>${short.short_description || 'No description.'}</small></p>
+                         <p><strong>${short.short_name || `Short ${short.id}`}</strong></p>
+                         ${short.short_description ? `<p><small>${short.short_description}</small></p>` : ''}
                          <p>Status: <strong class="${getVideoStatusClass(short.status)}">${short.status}</strong></p>
+                         ${shortIsFailed && short.error_message ? `<p><small style="color: var(--danger-color);">Error: ${short.error_message}</small></p>` : ''}
                      </div>
                      <div class="short-time">
                          <label for="start-${short.id}">Start:</label>
-                         <input type="text" value="${short.start_time}" id="start-${short.id}" pattern="\\d{1,3}:\\d{2}:\\d{2}" title="H:MM:SS or HH:MM:SS" ${!canUpdate ? 'disabled' : ''}>
+                         <input type="text" value="${short.start_time || ''}" id="start-${short.id}" pattern="\\d{1,3}:\\d{2}:\\d{2}(\\.\\d+)?" title="H:MM:SS or HH:MM:SS or H:MM:SS.ms" ${!canUpdateTimes ? 'disabled' : ''}>
                          <label for="end-${short.id}">End:</label>
-                         <input type="text" value="${short.end_time}" id="end-${short.id}" pattern="\\d{1,3}:\\d{2}:\\d{2}" title="H:MM:SS or HH:MM:SS" ${!canUpdate ? 'disabled' : ''}>
-                         <button onclick="updateShort(${videoId}, ${short.id})" title="Save time changes (resets status if completed)" ${!canUpdate ? 'disabled' : ''}>Update Times</button>
+                         <input type="text" value="${short.end_time || ''}" id="end-${short.id}" pattern="\\d{1,3}:\\d{2}:\\d{2}(\\.\\d+)?" title="H:MM:SS or HH:MM:SS or H:MM:SS.ms" ${!canUpdateTimes ? 'disabled' : ''}>
+                         <button onclick="updateShort(${videoId}, ${short.id})" title="Save time changes (resets status to pending if completed)" ${!canUpdateTimes ? 'disabled' : ''}>Update Times</button>
                      </div>
                      <div class="short-actions">
-                         <button onclick="createShort(${videoId}, ${short.id})" ${!canCreate ? 'disabled' : ''} title="${canCreate ? 'Generate this short video' : 'Short already created or processing'}">
-                            ${short.status === 'failed' ? 'Retry Create' : 'Create'}
+                         <button onclick="createShort(${videoId}, ${short.id})" ${!canCreate ? 'disabled' : ''} title="${canCreate ? 'Generate this short video' : (shortIsProcessing ? 'Processing...' : 'Already created')}">
+                            ${shortIsFailed ? 'Retry Create' : 'Create'}
                          </button>
-                         <button onclick="recreateShort(${videoId}, ${short.id})" ${!canRecreate ? 'disabled' : ''} title="${canRecreate ? 'Re-generate this short video (overwrites existing)' : 'Cannot recreate yet'}">
+                         <button onclick="recreateShort(${videoId}, ${short.id})" ${!canRecreate ? 'disabled' : ''} title="${canRecreate ? 'Re-generate this short video (overwrites existing)' : (shortIsProcessing ? 'Processing...' : 'Create first')}">
                              Recreate
                          </button>
-                         <button onclick="playVideo('${short.short_url}', 'Short: ${short.short_name}')" ${!canPlay ? 'disabled' : ''} title="${canPlay ? 'Play the generated short' : 'Short not ready or URL missing'}">
+                         <button onclick="playVideo('${short.short_url}', 'Short: ${short.short_name || `Short ${short.id}`}')" ${!canPlay ? 'disabled' : ''} title="${canPlay ? 'Play the generated short' : (shortIsProcessing ? 'Processing...' : 'Short not ready or URL missing')}">
                              Play Short
                          </button>
-                         <!-- Potential Delete Short Button -->
-                         <!-- <button class="danger" onclick="deleteShort(${videoId}, ${short.id})" title="Delete this short suggestion/file">Delete Short</button> -->
+                         <!-- <button class="danger" onclick="deleteShort(${videoId}, ${short.id})" title="Delete this short (Not Implemented)">Delete Short</button> -->
                      </div>
                  `;
                  shortsList.appendChild(shortDiv);
              });
 
-             // Add Suggest More button if applicable
-              if (video.status === 'completed' && hasSuggestibleContent) {
+             // --- Add "Suggest More" Button (if applicable) ---
+             if (video.status === 'completed' && hasSuggestibleContent) {
                    const suggestMoreButton = document.createElement('button');
                    suggestMoreButton.textContent = 'Suggest More Shorts';
-                   suggestMoreButton.onclick = () => reprocessSuggestions(videoId);
-                   suggestMoreButton.title = 'Generate new suggestions (clears pending/failed)';
-                   suggestMoreButton.style.marginTop = '15px';
+                   suggestMoreButton.onclick = () => reprocessSuggestions(videoId); // Reuse the regenerate function
+                   suggestMoreButton.title = 'Generate additional suggestions (may replace pending/failed ones)';
+                   suggestMoreButton.style.marginTop = '20px'; // Space above the button
                    shortsList.appendChild(suggestMoreButton);
-              }
+             }
          }
 
-        function closeShortsModal() {
-            console.log("Closing shorts modal, clearing interval.");
-            if (refreshIntervalId) {
-                clearInterval(refreshIntervalId);
-                refreshIntervalId = null;
-            }
-            currentModalVideoId = null; // Reset tracking ID
-            const modal = document.getElementById('shortsModal');
-            if (modal) modal.style.display = 'none';
-            const list = document.getElementById('shortsList');
-            if (list) list.innerHTML = ''; // Clear content
-            setStatus('shortsModalStatus', ''); // Clear status
-            // Debounce the main list refresh to avoid rapid updates if closed/opened quickly
-            debouncedLoadAndRender();
-        }
+
+        // --- Close Modals ---
+        function closeModal(modalId) {
+             const modal = document.getElementById(modalId);
+             if (modal) modal.style.display = 'none';
+             document.body.style.overflow = 'auto'; // Restore background scroll
+
+             // If closing shorts modal, clear interval and reset tracking ID
+             if (modalId === 'shortsModal') {
+                 console.log("Closing shorts modal, clearing interval.");
+                 if (refreshIntervalId) {
+                     clearInterval(refreshIntervalId);
+                     refreshIntervalId = null;
+                 }
+                 currentModalVideoId = null; // Reset tracking ID
+                 const list = document.getElementById('shortsList');
+                 if (list) list.innerHTML = ''; // Clear content
+                 setStatus('shortsModalStatus', ''); // Clear status
+                 // Debounce main list refresh to avoid rapid updates if closed/opened quickly
+                 debouncedLoadAndRender();
+             }
+             // If closing video modal, pause video
+             if (modalId === 'videoModal') {
+                  const video = document.getElementById('modalVideo');
+                  if (video) {
+                      video.pause();
+                      video.removeAttribute('src'); // Release the source
+                      video.load(); // Reset
+                  }
+                  document.getElementById('videoModalTitle').textContent = 'Video Player'; // Reset title
+             }
+         }
+
+        function closeShortsModal() { closeModal('shortsModal'); }
+        function closeVideoModal() { closeModal('videoModal'); }
 
         // --- Short Action Functions ---
         async function performShortAction(url, videoId, shortId, actionName) {
              setStatus('shortsModalStatus', `${actionName} short ${shortId}...`, false, 0); // Persistent status
 
-             // Find the specific short div and disable its action buttons
-             const shortDiv = document.querySelector(`#shortsList div.short-item[data-short-id='${shortId}']`);
-             const buttons = shortDiv ? shortDiv.querySelectorAll('.short-actions button, .short-time button') : [];
+             // Find the specific short item div and disable its buttons
+             const shortItemDiv = document.querySelector(`#shortsList .short-item[data-short-id='${shortId}']`);
+             const buttons = shortItemDiv ? shortItemDiv.querySelectorAll('button') : [];
              buttons.forEach(btn => btn.disabled = true);
 
              try {
-                 const response = await fetch(url, { method: 'POST' });
+                 const response = await fetchWithCacheBust(url, { method: 'POST' });
                  const data = await response.json();
                  if (!response.ok) {
                      throw new Error(data.error || `${actionName} failed with status ${response.status}`);
                  }
+                 // Display success message briefly, interval will update status correctly
                  setStatus('shortsModalStatus', data.message || `${actionName} started for short ${shortId}. Status will update.`, false, 7000);
 
-                 // Optimistic UI update to 'queued'
+                 // Optimistic UI update: Set status to 'queued' locally and re-render modal
                  const shortIndex = videosData[videoId]?.shorts.findIndex(s => s.id === shortId);
-                 if (shortIndex > -1) {
-                      videosData[videoId].shorts[shortIndex].status = 'queued';
+                 if (shortIndex > -1 && videosData[videoId].shorts[shortIndex].status !== 'queued') {
+                      videosData[videoId].shorts[shortIndex].status = 'queued'; // Assume it's queued
+                      updateShortsModal(videoId); // Re-render modal immediately
                  }
-                 // Re-render modal immediately to show 'queued' status and disabled buttons
-                 updateShortsModal(videoId);
-                 // Interval refresh will catch the final status later.
+                 // No need to manually re-enable buttons here, the next refresh interval will fetch the true state.
+                 // Ensure interval is running
+                 clearAndSetRefreshInterval();
 
              } catch (error) {
                  setStatus('shortsModalStatus', `${actionName} failed: ${error.message}`, true, 0); // Persistent error
-                 console.error(`Error ${actionName} short:`, error);
-                 // Force a fetch to get the correct 'failed' status from backend
+                 console.error(`Error ${actionName} short ${shortId}:`, error);
+                 // Force a fetch after a short delay to get the accurate 'failed' status from backend
                  setTimeout(async () => {
                      if (currentModalVideoId === videoId) { // Only if modal still relevant
                          const shorts = await fetchShortsForVideo(videoId);
@@ -870,31 +1228,33 @@
             const startTime = startTimeInput.value.trim();
             const endTime = endTimeInput.value.trim();
 
-            // Use regex for validation H:MM:SS or HH:MM:SS etc.
-            const timePattern = /^\d{1,3}:\d{2}:\d{2}$/;
+            // Relaxed pattern allowing H:MM:SS or H:MM:SS.ms
+            const timePattern = /^\d{1,3}:\d{2}:\d{2}(\.\d+)?$/;
             if (!timePattern.test(startTime) || !timePattern.test(endTime)) {
-                setStatus('shortsModalStatus', 'Invalid time format. Use H:MM:SS or HH:MM:SS.', true);
+                setStatus('shortsModalStatus', 'Invalid time format. Use H:MM:SS or H:MM:SS.ms.', true, 5000);
                 return;
             }
 
-            // Convert to seconds for reliable comparison
-            const timeToSec = (t) => t.split(':').reduce((acc, time) => (60 * acc) + parseInt(time, 10), 0);
+            // Convert to seconds for comparison (ignoring milliseconds for comparison)
+            const timeToSec = (t) => {
+                const parts = t.split('.')[0].split(':'); // Ignore ms part for comparison
+                return parts.reduce((acc, time) => (60 * acc) + parseInt(time, 10), 0);
+            }
              try {
                   if (timeToSec(startTime) >= timeToSec(endTime)) {
-                      setStatus('shortsModalStatus', 'Start time must be before end time.', true);
+                      setStatus('shortsModalStatus', 'Start time must be before end time.', true, 5000);
                       return;
                   }
              } catch (e) {
-                  setStatus('shortsModalStatus', 'Invalid time value entered.', true);
+                  setStatus('shortsModalStatus', 'Invalid time value entered.', true, 5000);
                   return;
              }
 
-
-             setStatus('shortsModalStatus', `Updating times for short ${shortId}...`, false, 0);
-             updateButton.disabled = true;
+             setStatus('shortsModalStatus', `Updating times for short ${shortId}...`, false, 0); // Persistent
+             if(updateButton) updateButton.disabled = true;
 
              try {
-                  const response = await fetch(`/videos/${videoId}/shorts/${shortId}/update`, {
+                  const response = await fetchWithCacheBust(`/videos/${videoId}/shorts/${shortId}/update`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ start_time: startTime, end_time: endTime })
@@ -903,18 +1263,19 @@
                   if (!response.ok) {
                       throw new Error(data.error || 'Failed to update short times.');
                   }
-                  setStatus('shortsModalStatus', data.message || 'Short updated successfully.', false, 7000);
+                  setStatus('shortsModalStatus', data.message || 'Short times updated successfully. Status reset to pending.', false, 7000);
 
-                  // Update local cache with returned data
+                   // Update local cache with the *returned* short data (which should include updated status)
                    if (data.short) {
                        const shortIndex = videosData[videoId]?.shorts.findIndex(s => s.id === shortId);
                        if (shortIndex > -1) {
-                            // Merge returned data with existing data
-                            videosData[videoId].shorts[shortIndex] = { ...videosData[videoId].shorts[shortIndex], ...data.short };
+                            // Replace the old short data with the new data from the server
+                            videosData[videoId].shorts[shortIndex] = data.short;
                        }
-                       updateShortsModal(videoId); // Re-render with updated cache
+                       updateShortsModal(videoId); // Re-render modal with updated cache
                    } else {
-                        // If backend didn't return updated short, fetch latest state just in case
+                        // Fallback: If backend didn't return updated short, force a refresh
+                        console.warn("Backend didn't return updated short data, forcing refresh.");
                         const shorts = await fetchShortsForVideo(videoId);
                         videosData[videoId].shorts = shorts;
                         updateShortsModal(videoId);
@@ -923,10 +1284,8 @@
              } catch (error) {
                   setStatus('shortsModalStatus', `Update failed: ${error.message}`, true, 0); // Persistent error
                   console.error('Error updating short:', error);
-                  // Re-enable button only if the error was temporary (e.g., network)
-                  // If it's a validation error, keep disabled until fixed.
-                  // Let's re-enable for now.
-                  updateButton.disabled = false;
+                  // Re-enable button on error
+                  if(updateButton) updateButton.disabled = false;
              }
         }
 
@@ -935,37 +1294,39 @@
             if (url && url !== 'null' && url !== 'undefined') {
                 document.getElementById('videoModalTitle').textContent = title;
                 const videoElement = document.getElementById('modalVideo');
-                // Add cache buster to video URL
+                // Add cache buster to video URL to ensure fresh playback
                 const separator = url.includes('?') ? '&' : '?';
-                videoElement.src = `${url}${separator}t=${new Date().getTime()}`;
+                videoElement.src = `${url}${separator}_=${new Date().getTime()}`;
                 document.getElementById('videoModal').style.display = 'block';
-                videoElement.play().catch(e => console.warn("Autoplay may be blocked:", e));
+                document.body.style.overflow = 'hidden'; // Prevent background scroll
+                videoElement.play().catch(e => console.warn("Autoplay may be blocked by browser:", e));
             } else {
-                setStatus('listStatus', 'Video is not available or URL is missing.', true);
+                setStatus('listStatus', 'Video URL is not available for playback.', true, 5000);
             }
         }
+        // closeVideoModal is handled by closeModal('videoModal')
 
-        function closeVideoModal() {
-            const video = document.getElementById('modalVideo');
-            video.pause();
-            video.removeAttribute('src'); // Release the source
-            video.load(); // Reset
-            document.getElementById('videoModalTitle').textContent = 'Video Player'; // Reset title
-            document.getElementById('videoModal').style.display = 'none';
-        }
 
         // --- Delete Video ---
         async function deleteVideo(videoId) {
             const video = videosData[videoId];
             const videoTitle = video ? (video.title || video.original_filename) : `ID ${videoId}`;
-            if (!confirm(`DELETE Video: ${videoTitle}?\n\nThis permanently removes:\n- Original, edited, subtitle, and short files.\n- All database records for this video and its shorts.\n\nThis action CANNOT be undone.`)) {
+
+            // Enhanced confirmation message
+            if (!confirm(`DELETE Video: ${videoTitle}?\n\nWARNING: This permanently removes:\n- Original video file\n- Edited video file\n- Uploaded subtitle file\n- All generated short video files\n- All database records for this video and its shorts.\n\nThis action CANNOT be undone.`)) {
                  return;
             }
 
-            setStatus('listStatus', `Deleting video ${videoTitle}...`, false, 0);
+            setStatus('listStatus', `Deleting video ${videoTitle}...`, false, 0); // Persistent status
+            // Disable buttons on the row being deleted
+            const row = document.querySelector(`tr[data-video-id="${videoId}"]`);
+            const buttons = row ? row.querySelectorAll('button') : [];
+            buttons.forEach(btn => btn.disabled = true);
+
+
             try {
-                 const response = await fetch(`/videos/${videoId}`, { method: 'DELETE' });
-                 const data = await response.json(); // Expecting { message } or { error }
+                 const response = await fetchWithCacheBust(`/videos/${videoId}`, { method: 'DELETE' });
+                 const data = await response.json();
                  if (!response.ok) {
                      throw new Error(data.error || 'Failed to delete video.');
                  }
@@ -977,37 +1338,43 @@
 
                  // If the deleted video's modal was open, close it
                  if (currentModalVideoId === videoId) {
-                     closeShortsModal();
+                     closeShortsModal(); // This handles cleanup for the shorts modal
                  }
 
             } catch (error) {
                  setStatus('listStatus', `Deletion failed: ${error.message}`, true, 0); // Persistent error
                  console.error('Error deleting video:', error);
+                 // Re-enable buttons on the row if deletion failed
+                 buttons.forEach(btn => btn.disabled = false);
+                 // Optionally trigger a refresh to get the latest state from the server
+                 setTimeout(loadAndRenderVideos, 1500);
             }
         }
 
-        // --- Initial Load & Event Listeners ---
-        document.addEventListener('DOMContentLoaded', loadAndRenderVideos);
+        // --- Initial Load & Global Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAndRenderVideos(); // Initial load of video list
+        });
 
-        // Close modals on background click
+        // Close modals on background click (click outside content)
          window.addEventListener('click', function(event) {
              const videoModal = document.getElementById('videoModal');
              const shortsModal = document.getElementById('shortsModal');
-             if (event.target == videoModal) {
+             if (event.target == videoModal) { // Clicked on the semi-transparent background
                  closeVideoModal();
              }
-             if (event.target == shortsModal) {
+             if (event.target == shortsModal) { // Clicked on the semi-transparent background
                  closeShortsModal();
              }
          });
 
           // Close modals on Escape key press
           window.addEventListener('keydown', function(event) {
-               if (event.key === 'Escape') {
+               if (event.key === 'Escape' || event.key === 'Esc') { // Check for both Escape and Esc
+                    // Close the topmost modal first
                     if (document.getElementById('videoModal').style.display === 'block') {
                          closeVideoModal();
-                    }
-                    if (document.getElementById('shortsModal').style.display === 'block') {
+                    } else if (document.getElementById('shortsModal').style.display === 'block') {
                          closeShortsModal();
                     }
                }
