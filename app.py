@@ -394,6 +394,22 @@ def serve_short(filename):
 def index():
     return app.send_static_file('index.html')
 
+@app.route('/videos/<int:video_id>/shorts', methods=['GET'])
+def get_shorts(video_id):
+    video = Video.query.get(video_id)
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
+    shorts = ShortSegment.query.filter_by(video_id=video_id).all()
+    return jsonify([{
+        'id': s.id,
+        'short_name': s.short_name,
+        'short_description': s.short_description,
+        'start_time': s.start_time,
+        'end_time': s.end_time,
+        'status': s.status,
+        'short_url': url_for('serve_short', filename=s.short_filename, _external=True) if s.short_filename else None
+    } for s in shorts])
+
 import socket
 
 def get_local_ip():

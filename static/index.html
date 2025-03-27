@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Video Shorts Generator</title>
     <link rel="stylesheet" href="styles.css">
-
 </head>
 <body>
     <h1>Video Shorts Generator</h1>
@@ -28,10 +27,9 @@
         <tbody></tbody>
     </table>
 
-    <!-- Replace the existing modal divs with these updated versions -->
     <div id="shortsModal" class="modal">
         <div id="shortsModalContent">
-            <button class="close-button" onclick="closeShortsModal()">&times;</button>
+            <button class="close-button" onclick="closeShortsModal()">×</button>
             <h3>Shorts</h3>
             <div id="shortsList"></div>
         </div>
@@ -39,13 +37,15 @@
 
     <div id="videoModal" class="modal">
         <div id="videoModalContent">
-            <button class="close-button" onclick="closeVideoModal()">&times;</button>
+            <button class="close-button" onclick="closeVideoModal()">×</button>
             <video id="modalVideo" controls></video>
         </div>
     </div>
 
     <script>
         let videosShorts = {};
+        let currentModalVideoId = null; // Track the video ID of the open modal
+        let refreshInterval = null;     // Interval for periodic modal refresh
 
         document.getElementById('uploadForm').addEventListener('submit', function(e) {
             e.preventDefault();
@@ -56,7 +56,7 @@
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('status').textContent = `Processing video ${data.video_id}...`;
-                    setTimeout(loadVideos, 2000); // Poll after delay
+                    setTimeout(loadVideos, 2000); // Refresh videos table after delay
                 })
                 .catch(error => {
                     document.getElementById('status').textContent = 'Upload failed.';
@@ -65,39 +65,42 @@
         });
 
         function loadVideos() {
-        fetch('/videos')
-            .then(response => response.json())
-            .then(videos => {
-                const tbody = document.querySelector('#videosTable tbody');
-                tbody.innerHTML = '';
-                videos.forEach(video => {
-                    videosShorts[video.id] = video.shorts;
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${video.id}</td>
-                        <td>${video.title}</td>
-                        <td><button onclick="playVideo('${video.edited_video_url}')">Play</button></td>
-                        <td><button onclick="showShorts(${video.id})">View Shorts</button></td>
-                        <td>
-                            <button onclick="deleteVideo(${video.id})">Delete</button>
-                            <button onclick="refreshShorts(${video.id})">Refresh</button>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
-                document.getElementById('status').textContent = '';
-            })
-            .catch(error => console.error('Error loading videos:', error));
+            fetch('/videos')
+                .then(response => response.json())
+                .then(videos => {
+                    const tbody = document.querySelector('#videosTable tbody');
+                    tbody.innerHTML = '';
+                    videos.forEach(video => {
+                        videosShorts[video.id] = video.shorts;
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${video.id}</td>
+                            <td>${video.title}</td>
+                            <td><button onclick="playVideo('${video.edited_video_url}')">Play</button></td>
+                            <td><button onclick="showShorts(${video.id})">View Shorts</button></td>
+                            <td>
+                                <button onclick="deleteVideo(${video.id})">Delete</button>
+                                <button onclick="refreshShorts(${video.id})">Refresh</button>
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                    document.getElementById('status').textContent = '';
+                    // Refresh the modal if it's open
+                    if (currentModalVideoId) {
+                        updateShortsModal(currentModalVideoId);
+                    }
+                })
+                .catch(error => console.error('Error loading videos:', error));
         }
 
-        // Add the refreshShorts function
         function refreshShorts(videoId) {
             if (confirm('Refresh shorts for this video? This will replace all uncreated shorts with new ones.')) {
                 fetch(`/videos/${videoId}/refresh`, { method: 'POST' })
                     .then(response => {
                         if (response.ok) {
                             document.getElementById('status').textContent = 'Refreshing shorts...';
-                            setTimeout(loadVideos, 2000); // Refresh table after delay
+                            setTimeout(loadVideos, 2000); // Refresh table and modal after delay
                         } else {
                             alert('Failed to refresh shorts.');
                         }
@@ -107,7 +110,28 @@
         }
 
         function showShorts(videoId) {
-            const shorts = videosShorts[videoId];
+            currentModalVideoId = videoId;
+            updateShortsModal(videoId);
+            document.getElementById('shortsModal').style.display = 'block';
+            // Start periodic refresh of the modal every 5 seconds
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            refreshInterval = setInterval(() => {
+                if (currentModalVideoId) {
+                    fetch(`/videos/${currentModalVideoId}/shorts`)
+                        .then(response => response.json())
+                        .then(shorts => {
+                            videosShorts[currentModalVideoId] = shorts;
+                            updateShortsModal(currentModalVideoId);
+                        })
+                        .catch(error => console.error('Error refreshing modal:', error));
+                }
+            }, 5000);
+        }
+
+        function updateShortsModal(videoId) {
+            const shorts = videosShorts[videoId] || [];
             const shortsList = document.getElementById('shortsList');
             shortsList.innerHTML = shorts.map(short => `
                 <div>
@@ -120,15 +144,37 @@
                     <button onclick="playVideo('${short.short_url}')" ${short.status !== 'completed' ? 'disabled' : ''}>Play</button>
                 </div>
             `).join('');
-            document.getElementById('shortsModal').style.display = 'block';
         }
+
+        function closeShortsModal() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+            currentModalVideoId = null;
+            document.getElementById('shortsModal').style.display = 'none';
+        }
+
+        function createShort(videoId, shortId) {
+            fetch(`/videos/${videoId}/shorts/${shortId}/create`, { method: 'POST' })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Short creation started.');
+                        setTimeout(loadVideos, 2000); // Refresh table and modal after delay
+                    } else {
+                        alert('Failed to create short.');
+                    }
+                })
+                .catch(error => console.error('Error creating short:', error));
+        }
+
         function recreateShort(videoId, shortId) {
             if (confirm('Are you sure you want to recreate this short? This will overwrite the existing file.')) {
                 fetch(`/videos/${videoId}/shorts/${shortId}/recreate`, { method: 'POST' })
                     .then(response => {
                         if (response.ok) {
                             alert('Short recreation started.');
-                            setTimeout(loadVideos, 2000);  // Refresh after delay
+                            setTimeout(loadVideos, 2000); // Refresh table and modal after delay
                         } else {
                             alert('Failed to recreate short.');
                         }
@@ -136,6 +182,7 @@
                     .catch(error => console.error('Error recreating short:', error));
             }
         }
+
         function updateShort(videoId, shortId) {
             const startTime = document.getElementById(`start-${shortId}`).value;
             const endTime = document.getElementById(`end-${shortId}`).value;
@@ -147,7 +194,7 @@
             .then(response => {
                 if (response.ok) {
                     alert('Short updated successfully.');
-                    loadVideos();  // Refresh the video list
+                    loadVideos(); // Refresh table and modal immediately
                 } else {
                     alert('Failed to update short.');
                 }
@@ -155,28 +202,11 @@
             .catch(error => console.error('Error updating short:', error));
         }
 
-        function createShort(videoId, shortId) {
-            fetch(`/videos/${videoId}/shorts/${shortId}/create`, { method: 'POST' })
-                .then(response => {
-                    if (response.ok) {
-                        alert('Short creation started.');
-                        setTimeout(loadVideos, 2000); // Refresh after delay
-                    } else {
-                        alert('Failed to create short.');
-                    }
-                })
-                .catch(error => console.error('Error creating short:', error));
-        }
-
         function playVideo(url) {
             if (url) {
                 document.getElementById('modalVideo').src = url;
                 document.getElementById('videoModal').style.display = 'block';
             }
-        }
-
-        function closeShortsModal() {
-            document.getElementById('shortsModal').style.display = 'none';
         }
 
         function closeVideoModal() {
@@ -190,8 +220,11 @@
             if (confirm('Delete this video and its shorts?')) {
                 fetch(`/videos/${videoId}`, { method: 'DELETE' })
                     .then(response => {
-                        if (response.ok) loadVideos();
-                        else alert('Failed to delete video.');
+                        if (response.ok) {
+                            loadVideos(); // Refresh table and modal immediately
+                        } else {
+                            alert('Failed to delete video.');
+                        }
                     })
                     .catch(error => console.error('Error deleting video:', error));
             }

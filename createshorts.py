@@ -14,7 +14,7 @@ change_settings({"IMAGEMAGICK_BINARY": r"C:\Program Files\ImageMagick-7.1.1-Q16-
 DATA_DIR = os.path.abspath("data")
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 EDITED_VIDEOS_DIR = os.path.join(DATA_DIR, "edited-videos")
-EDITED_SHORTS_DIR = os.path.join(DATA_DIR, "edited-shorted")
+EDITED_SHORTS_DIR = os.path.join(DATA_DIR, "edited-shorts")
 AUDIO_DIR = os.path.join(DATA_DIR, "audio")
 for dir_path in [DATA_DIR, VIDEOS_DIR, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR, AUDIO_DIR]:
     os.makedirs(dir_path, exist_ok=True)
@@ -25,7 +25,7 @@ subtitle_fontsize = 70
 subtitle_color = "white"
 subtitle_stroke_width = 4
 subtitle_stroke_color = "black"
-zoom_factor = 1.5
+zoom_factor = 2.0
 subtitle_vertical_offset = 550
 
 def transcribe_audio(video_path, video_id):
