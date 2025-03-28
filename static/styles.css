@@ -1,120 +1,726 @@
-/* Base styles */
+
+:root {
+    --primary-color: #007bff;
+    --primary-hover: #0056b3;
+    --danger-color: #dc3545;
+    --danger-hover: #c82333;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+    --processing-color: orange;
+    --failed-color: var(--danger-color);
+    --completed-color: var(--success-color);
+    --pending-color: gray;
+    --queued-color: var(--info-color);
+    --pending-reprocess-color: purple;
+    --text-color: #333;
+    --light-gray: #f8f9fa;
+    --medium-gray: #e9ecef;
+    --border-color: #dee2e6;
+    --border-radius: 5px; /* Slightly increased for softer look */
+    --box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    --box-shadow-light: 0 1px 3px rgba(0,0,0,0.08);
+}
+#shortsModalContent { /* Target the specific modal content */
+    /* Add these properties: */
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh; /* Or adjust %/vh value as needed */
+
+    /* Ensure existing relevant styles remain */
+    background-color: #fff;
+    margin: 5% auto;
+    padding: 25px;
+    border: none;
+    width: 90%;
+    max-width: 800px;
+    position: relative; /* Keep this for the absolute close button */
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    animation: slideIn 0.3s;
+}
+
+/* Basic Reset & Box Sizing */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
 body {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background-color: #f5f5f5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 20px;
+    line-height: 1.6;
+    background-color: var(--light-gray);
+    color: var(--text-color);
+}
+
+/* Sections */
+#uploadSection, #videosTableContainer {
+     background-color: #fff;
+     padding: 20px;
+     margin-bottom: 25px;
+     border-radius: var(--border-radius);
+     box-shadow: var(--box-shadow);
 }
 
 h1, h2 {
-    color: #333;
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-top: 0; /* Remove default top margin */
+    margin-bottom: 20px;
+}
+h1 { font-size: 1.8rem; }
+h2 { font-size: 1.5rem; }
+
+hr { border: 0; border-top: 1px solid var(--border-color); margin: 30px 0; }
+
+label {
+     margin-right: 10px;
+     font-weight: bold;
+     display: block; /* Default to block for stacking */
+     margin-bottom: 5px;
 }
 
-/* Table styles */
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-    background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+input[type="file"], input[type="text"], button {
+     padding: 10px 15px; /* Increased padding */
+     margin: 5px 0;
+     border-radius: var(--border-radius);
+     border: 1px solid var(--border-color);
+     font-size: 1rem;
+     vertical-align: middle; /* Align better with text/other elements */
 }
+ input[type="text"] {
+     width: 100%; /* Default to full width, containers will manage */
+ }
+ input[type="file"] {
+      width: 100%;
+      border: 1px dashed var(--border-color); /* Style file input */
+      background-color: var(--light-gray);
+      cursor: pointer;
+ }
+ input[type="file"]:hover {
+     border-color: var(--primary-color);
+ }
 
-th, td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-}
-
-th {
-    background-color: #f8f9fa;
-}
-
-/* Button styles */
 button {
-    padding: 8px 16px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
+     cursor: pointer;
+     background-color: var(--primary-color);
+     color: white;
+     border: none;
+     transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+button:hover:not(:disabled) { background-color: var(--primary-hover); }
+button:disabled { background-color: #cccccc; cursor: not-allowed; opacity: 0.7; }
+button.danger { background-color: var(--danger-color); }
+button.danger:hover:not(:disabled) { background-color: var(--danger-hover); }
+
+.status {
+     margin-top: 15px;
+     font-style: italic;
+     color: #555;
+     min-height: 1.2em;
+     padding: 10px;
+     border-radius: var(--border-radius);
+     border: 1px solid transparent; /* Reserve space for border */
+}
+.status-processing { color: var(--processing-color); font-weight: bold; background-color: #fff8e1; border-color: var(--processing-color);}
+.status-completed { color: var(--completed-color); font-weight: bold; background-color: #e9f7ef; border-color: var(--completed-color);}
+.status-failed { color: var(--failed-color); font-weight: bold; background-color: #fdeded; border-color: var(--failed-color);}
+.status-pending { color: var(--pending-color); background-color: #f8f9fa; border-color: var(--pending-color);}
+.status-queued { color: var(--queued-color); font-weight: bold; background-color: #e3f2fd; border-color: var(--info-color);}
+.status-pending_reprocess { color: var(--pending-reprocess-color); font-weight: bold; background-color: #f3e5f5; border-color: var(--pending-reprocess-color);}
+.status-info { color: var(--info-color); background-color: #e3f2fd; border-color: var(--info-color);} /* Added for general info */
+
+small { font-size: 0.85em; color: #555; display: block; margin-top: 2px; word-break: break-all; }
+
+/* Upload Form Specifics */
+ #uploadForm {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+ }
+ #uploadForm label {
+      margin-bottom: 0; /* Remove bottom margin as gap handles it */
+ }
+ #uploadForm button {
+      margin-top: 10px;
+      align-self: flex-start; /* Prevent button stretching full width */
+ }
+
+/* Table styling */
+#videosTableContainer {
+     overflow-x: auto; /* Add horizontal scroll for small screens */
+     padding: 0; /* Remove container padding, table handles it */
+}
+#videosTable {
+     width: 100%;
+     border-collapse: collapse;
+     /* Removed margin-top as container handles spacing */
+     background-color: #fff;
+     /* Removed shadow/radius from table, container has it */
+     /* overflow: hidden; /* Can cause issues with shadows on scrolled content */
+}
+#videosTable th, #videosTable td {
+     border: 1px solid var(--border-color);
+     padding: 12px 15px;
+     text-align: left;
+     vertical-align: middle; /* Align content vertically */
+     word-break: break-word; /* Allow long words to break */
+}
+#videosTable th {
+     background-color: var(--medium-gray);
+     font-weight: bold;
+     white-space: nowrap; /* Prevent headers from wrapping */
+}
+/* Column widths - Adjust as needed */
+#videosTable th:nth-child(1), #videosTable td:nth-child(1) { width: 5%; text-align: center; } /* ID */
+#videosTable th:nth-child(2), #videosTable td:nth-child(2) { width: 30%; } /* Details */
+#videosTable th:nth-child(3), #videosTable td:nth-child(3) { width: 10%; text-align: center; } /* Full Video */
+#videosTable th:nth-child(4), #videosTable td:nth-child(4) { width: 15%; text-align: center; } /* Shorts Button */
+#videosTable th:nth-child(5), #videosTable td:nth-child(5) { width: 40%; } /* Actions & Subtitles */
+
+#videosTable td .button-group {
+     display: flex;
+     flex-wrap: wrap;
+     gap: 8px; /* Increased gap */
+     align-items: center;
+}
+#videosTable td .button-group button {
+     margin: 0; /* Remove default margin */
+     padding: 6px 10px; /* Slightly smaller buttons in table */
+     font-size: 0.9em;
+}
+
+/* Subtitle Upload Form Styling (within table) */
+.subtitle-upload-form {
+    margin-top: 10px; /* Space above this form */
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping */
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid var(--medium-gray);
+    padding-top: 10px;
+}
+.subtitle-upload-form label {
+     font-weight: normal;
+     font-size: 0.9em;
+     margin: 0; /* Remove default label margins */
+     flex-shrink: 0; /* Prevent label from shrinking */
+     display: inline-block; /* Allow inline display */
+     width: auto; /* Override block display */
+}
+.subtitle-upload-form input[type="file"] {
+     margin: 0;
+     padding: 6px;
+     flex-grow: 1; /* Allow file input to take available space */
+     font-size: 0.9em;
+     width: auto; /* Override 100% width */
+     min-width: 150px; /* Ensure usability */
+     border-style: solid; /* Override dashed */
+     background-color: white;
+}
+ .subtitle-upload-form button {
+     margin: 0;
+     padding: 6px 10px;
+     font-size: 0.9em;
+     flex-shrink: 0; /* Prevent button from shrinking */
+ }
+
+ /* Modal Styles */
+ .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); /* Darker overlay */ animation: fadeIn 0.3s; }
+ .modal-content { background-color: #fff; margin: 5% auto; padding: 25px; border: none; width: 90%; max-width: 800px; position: relative; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s; }
+ .close-button {  z-index: 10; position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; line-height: 1; background: none; border: none; padding: 0; }
+ .close-button:hover { color: var(--text-color); }
+ #modalVideo { width: 100%; max-height: 70vh; height: auto; background-color: #000; border-radius: var(--border-radius); display: block; } /* Added display block */
+
+ /* Shorts List Styling (Inside Modal) */
+ #shortsList { 
+    margin-top: 20px; 
+    flex-grow: 1; /* Allows the list to take available vertical space */
+    overflow-y: auto; /* Enables vertical scrolling ONLY for the list */
+    padding-right: 10px; /* Add slight padding so scrollbar doesn't overlap content *}
+ #shortsList .short-item {
+     border: 1px solid var(--medium-gray); /* Use border instead of just bottom */
+     background-color: var(--light-gray);
+     padding: 15px;
+     margin-bottom: 15px; /* Space between items */
+     border-radius: var(--border-radius);
+     box-shadow: var(--box-shadow-light);
+}
+ /* #shortsList .short-item:last-child { border-bottom: 1px solid var(--medium-gray); } */ /* Remove last-child rule */
+ #shortsList p { margin: 5px 0 10px 0; }
+ #shortsList .short-info strong { font-size: 1.1em;}
+ #shortsList .short-time {
+      display: flex;
+      flex-wrap: wrap; /* Allow wrapping on small screens */
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      border-top: 1px dashed var(--border-color);
+      padding-top: 10px;
+      margin-top: 10px;
+ }
+ #shortsList .short-time label {
+     font-weight: normal;
+     margin: 0;
+     font-size: 0.9em;
+     display: inline-block; /* Override block */
+     width: auto; /* Override block */
+ }
+ #shortsList .short-time input[type="text"] {
+     padding: 6px 8px;
+     font-size: 0.9em;
+     margin: 0;
+     border: 1px solid var(--medium-gray);
+     /* Flexible width: takes available space, min/max limits */
+     flex: 1 1 auto;
+     min-width: 75px; /* Ensure usable width */
+     max-width: 100px; /* Prevent growing too large */
+     width: auto; /* Override 100% default */
+ }
+ #shortsList .short-time button {
+     padding: 6px 10px;
+     font-size: 0.9em;
+     margin: 0;
+     flex-shrink: 0; /* Prevent shrinking */
+ }
+ #shortsList .short-actions {
+     margin-top: 10px;
+     display: flex;
+     flex-wrap: wrap;
+     gap: 8px;
+     padding-top: 10px;
+     border-top: 1px dashed var(--border-color);
+ }
+ #shortsList .short-actions button {
+     margin: 0;
+     padding: 6px 10px;
+     font-size: 0.9em;
+ }
+ /* Button added dynamically for suggesting more */
+ #shortsList > button {
+     margin-top: 15px;
+ }
+
+
+ /* Animations */
+ @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+ @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 768px) {
+    body {
+        margin: 10px; /* Reduced margin */
+        font-size: 0.95rem; /* Slightly smaller base font */
+    }
+
+    h1 { font-size: 1.6rem; }
+    h2 { font-size: 1.3rem; }
+
+    #uploadSection, #videosTableContainer {
+         padding: 15px; /* Reduced padding */
+         margin-bottom: 20px;
+    }
+
+    input[type="file"], input[type="text"], button {
+         padding: 8px 12px; /* Slightly reduce padding */
+         font-size: 0.95rem;
+    }
+
+    /* Table adjustments */
+    #videosTable th, #videosTable td {
+         padding: 8px; /* Reduced cell padding */
+    }
+     /* Example: Adjust specific columns if needed, e.g., make ID column smaller */
+     #videosTable th:nth-child(1), #videosTable td:nth-child(1) { width: auto; font-size: 0.85em; } /* Let ID shrink */
+     #videosTable th:nth-child(3), #videosTable td:nth-child(3), /* Play */
+     #videosTable th:nth-child(4), #videosTable td:nth-child(4) { width: auto; } /* Shorts */
+     /* Give more space to Details and Actions */
+     #videosTable th:nth-child(2), #videosTable td:nth-child(2) { min-width: 120px; } /* Details */
+     #videosTable th:nth-child(5), #videosTable td:nth-child(5) { min-width: 200px; } /* Actions */
+
+
+    #videosTable td .button-group {
+         gap: 5px; /* Slightly reduce gap */
+    }
+    #videosTable td .button-group button {
+         padding: 5px 8px;
+         font-size: 0.85em;
+    }
+     .subtitle-upload-form {
+          gap: 5px;
+     }
+     .subtitle-upload-form input[type="file"] {
+          min-width: 120px; /* Adjust min-width if needed */
+     }
+     .subtitle-upload-form button {
+         padding: 5px 8px;
+         font-size: 0.85em;
+     }
+
+
+    /* Modal adjustments */
+    .modal-content {
+        padding: 20px; /* Reduce modal padding */
+        margin: 10% auto; /* Adjust vertical margin */
+    }
+
+    /* Shorts List inside modal */
+    #shortsList .short-item {
+        padding: 10px;
+    }
+    #shortsList .short-time { gap: 5px; }
+    #shortsList .short-time input[type="text"] {
+         min-width: 65px; /* Further reduce min width */
+         max-width: 90px;
+    }
+    #shortsList .short-actions { gap: 5px; }
+    #shortsList .short-actions button,
+    #shortsList .short-time button {
+        padding: 5px 8px;
+        font-size: 0.85em;
+    }
+
+} /* End of media query */
+/* --- Dark Mode Toggle Switch --- */
+.theme-switch-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Space between switch and text */
+    position: absolute; /* Position relative to the nearest positioned ancestor or initial containing block */
+    top: 20px; /* Adjust as needed */
+    right: 20px; /* Adjust as needed */
+}
+.theme-switch-wrapper em {
+    font-size: 0.9rem;
+    color: var(--text-color); /* Use variable */
+}
+
+.theme-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px; /* Width of the switch */
+    height: 24px; /* Height of the switch */
+}
+
+.theme-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
     cursor: pointer;
-}
-
-button:hover {
-    background-color: #0056b3;
-}
-
-button:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-}
-
-/* Modal styles */
-#shortsModal, #videoModal {
-    display: none;
-    position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
 }
 
-#shortsModalContent, #videoModalContent {
+.slider:before {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    content: "";
+    height: 18px; /* Size of the handle */
+    width: 18px;  /* Size of the handle */
+    left: 3px;    /* Position from left */
+    bottom: 3px;  /* Position from bottom */
     background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    max-width: 80%;
-    max-height: 80vh;
-    overflow-y: auto;
+    transition: .4s;
 }
 
-/* Form styles */
-#uploadForm {
+input:checked + .slider {
+    background-color: var(--primary-color); /* Use theme color when active */
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px var(--primary-color);
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px); /* Move handle to the right */
+}
+
+/* Rounded sliders */
+.slider.round {
+    border-radius: 24px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
+
+/* --- Dark Mode Theme Variables & Overrides --- */
+/* Define light mode variables in :root (already done) */
+:root {
+    /* ... keep existing light mode variables ... */
+    --bg-color: var(--light-gray);
+    --section-bg: #fff;
+    --text-color-strong: #000; /* For stronger text like headers */
+    --input-bg: #fff;
+    --input-border: var(--border-color);
+    --modal-bg: #fff;
+    --table-header-bg: var(--medium-gray);
+    --shadow-color: rgba(0,0,0,0.1);
+    --shadow-color-light: rgba(0,0,0,0.08);
+    --shadow-color-modal: rgba(0,0,0,0.3);
+    --close-button-color: #aaa;
+    --close-button-hover: var(--text-color);
+    --status-processing-bg: #fff8e1;
+    --status-completed-bg: #e9f7ef;
+    --status-failed-bg: #fdeded;
+    --status-pending-bg: #f8f9fa;
+    --status-queued-bg: #e3f2fd;
+    --status-pending_reprocess-bg: #f3e5f5;
+    --status-info-bg: #e3f2fd;
+}
+
+/* Define dark mode variables when html has data-theme="dark" */
+html[data-theme="dark"] {
+    --primary-color: #409eff; /* Slightly brighter blue */
+    --primary-hover: #66b1ff;
+    --danger-color: #f56c6c;
+    --danger-hover: #f78989;
+    --success-color: #67c23a;
+    --warning-color: #e6a23c;
+    --info-color: #909399;
+    --processing-color: #e6a23c; /* Same as warning */
+    --failed-color: var(--danger-color);
+    --completed-color: var(--success-color);
+    --pending-color: #a8abb2;
+    --queued-color: var(--info-color);
+    --pending-reprocess-color: #b39ddb; /* Lighter purple */
+
+    --text-color: #e0e0e0; /* Light gray text */
+    --text-color-strong: #ffffff; /* White for strong text */
+    --light-gray: #2c2c2c; /* Darker gray */
+    --medium-gray: #3a3a3a; /* Medium dark gray */
+    --border-color: #444444; /* Lighter border for contrast */
+    --border-radius: 5px;
+    --shadow-color: rgba(255,255,255,0.05); /* Very subtle light shadow */
+    --shadow-color-light: rgba(255,255,255,0.03);
+    --shadow-color-modal: rgba(0,0,0,0.7); /* Darker modal overlay */
+
+    --bg-color: #121212; /* Very dark background */
+    --section-bg: #1e1e1e; /* Slightly lighter section background */
+    --input-bg: #2c2c2c;
+    --input-border: #555555;
+    --modal-bg: #282828; /* Dark modal background */
+    --table-header-bg: #333333; /* Dark table header */
+
+    --close-button-color: #888;
+    --close-button-hover: #ccc;
+
+     /* Darker, less saturated status backgrounds */
+    --status-processing-bg: #3a3a2a;
+    --status-completed-bg: #2a3a2a;
+    --status-failed-bg: #3a2a2a;
+    --status-pending-bg: #333333;
+    --status-queued-bg: #2a3a3a;
+    --status-pending_reprocess-bg: #3a2a3a;
+    --status-info-bg: #2a3a3a;
+}
+
+/* --- Apply Variables to Elements --- */
+/* Update existing rules to use the new variables */
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 20px;
+    line-height: 1.6;
+    background-color: var(--bg-color); /* USE VAR */
+    color: var(--text-color);         /* USE VAR */
+    transition: background-color 0.3s, color 0.3s; /* Smooth transition */
+}
+
+#uploadSection, #videosTableContainer {
+     background-color: var(--section-bg); /* USE VAR */
+     padding: 20px;
+     margin-bottom: 25px;
+     border-radius: var(--border-radius);
+     box-shadow: 0 2px 5px var(--shadow-color); /* USE VAR */
+     border: 1px solid var(--border-color); /* Add subtle border for dark mode */
+     transition: background-color 0.3s, border-color 0.3s;
+}
+
+h1, h2 {
+    color: var(--text-color-strong); /* USE VAR */
+    border-bottom: 1px solid var(--border-color); /* USE VAR */
+    padding-bottom: 10px;
+    margin-top: 0;
     margin-bottom: 20px;
-    padding: 20px;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: color 0.3s, border-color 0.3s;
 }
 
-#status {
-    margin: 10px 0;
-    padding: 10px;
-    border-radius: 4px;
+hr { border-top: 1px solid var(--border-color); /* USE VAR */ }
+
+label {
+     /* ... existing styles ... */
+     color: var(--text-color); /* Ensure label color uses variable */
 }
 
-/* Shorts list styles */
-#shortsList {
-    display: grid;
-    gap: 10px;
-    margin: 15px 0;
+input[type="file"], input[type="text"], button {
+     /* ... existing styles ... */
+     border: 1px solid var(--input-border); /* USE VAR */
+     background-color: var(--input-bg); /* USE VAR */
+     color: var(--text-color); /* Ensure input text is readable */
+     transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+}
+ input[type="file"] {
+      border: 1px dashed var(--input-border); /* USE VAR */
+      background-color: var(--medium-gray); /* Darker background for file input */
+ }
+ input[type="file"]:hover {
+     border-color: var(--primary-color); /* USE VAR */
+ }
+ input::placeholder { /* Style placeholder text */
+    color: var(--pending-color);
+    opacity: 0.7;
+ }
+
+/* Style buttons specifically for dark mode contrast if needed */
+html[data-theme="dark"] button {
+     color: #fff; /* Ensure text is white on primary/danger buttons */
+}
+ html[data-theme="dark"] button:disabled {
+      background-color: #555;
+      color: #999;
+      opacity: 0.6;
+ }
+
+.status {
+     /* ... existing styles ... */
+     color: #ccc; /* Default status text color in dark mode */
+     border: 1px solid transparent; /* Keep border */
+     background-color: transparent; /* Remove default light background */
+     transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+}
+/* Update status background/text/border colors using variables */
+.status-processing { color: var(--processing-color); background-color: var(--status-processing-bg); border-color: var(--processing-color);}
+.status-completed { color: var(--completed-color); background-color: var(--status-completed-bg); border-color: var(--completed-color);}
+.status-failed { color: var(--failed-color); background-color: var(--status-failed-bg); border-color: var(--failed-color);}
+.status-pending { color: var(--pending-color); background-color: var(--status-pending-bg); border-color: var(--pending-color);}
+.status-queued { color: var(--queued-color); background-color: var(--status-queued-bg); border-color: var(--info-color);} /* Use info color for border */
+.status-pending_reprocess { color: var(--pending-reprocess-color); background-color: var(--status-pending_reprocess-bg); border-color: var(--pending-reprocess-color);}
+.status-info { color: var(--info-color); background-color: var(--status-info-bg); border-color: var(--info-color);}
+
+small { color: var(--pending-color); /* Lighter gray for small text */ }
+
+/* Table styling */
+#videosTable {
+     /* ... existing styles ... */
+     background-color: var(--section-bg); /* USE VAR */
+     transition: background-color 0.3s;
+}
+#videosTable th, #videosTable td {
+     border: 1px solid var(--border-color); /* USE VAR */
+     /* ... existing styles ... */
+     transition: border-color 0.3s;
+}
+#videosTable th {
+     background-color: var(--table-header-bg); /* USE VAR */
+     color: var(--text-color-strong); /* USE VAR */
+     /* ... existing styles ... */
+     transition: background-color 0.3s, color 0.3s;
 }
 
-#shortsList div {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 4px;
-    border: 1px solid #dee2e6;
+/* Ensure table status text uses correct variable */
+#videosTable td .status-processing,
+#videosTable td .status-completed,
+#videosTable td .status-failed,
+#videosTable td .status-pending,
+#videosTable td .status-queued,
+#videosTable td .status-pending_reprocess {
+    background-color: transparent !important; /* Remove background inside table cell */
+    border: none !important; /* Remove border inside table cell */
+    padding: 0 !important; /* Remove padding inside table cell */
+    margin: 0 !important; /* Remove margin inside table cell */
+    font-weight: bold; /* Keep bold */
+}
+#videosTable td .status-processing { color: var(--processing-color); }
+#videosTable td .status-completed { color: var(--completed-color); }
+#videosTable td .status-failed { color: var(--failed-color); }
+#videosTable td .status-pending { color: var(--pending-color); font-weight: normal;} /* Pending not usually bold */
+#videosTable td .status-queued { color: var(--queued-color); }
+#videosTable td .status-pending_reprocess { color: var(--pending-reprocess-color); }
+
+
+/* Subtitle Upload Form Styling (within table) */
+.subtitle-upload-form {
+    /* ... existing styles ... */
+    border-top: 1px solid var(--medium-gray); /* USE VAR */
+}
+ html[data-theme="dark"] .subtitle-upload-form input[type="file"] {
+     background-color: var(--input-bg); /* Use input background color */
+     border-color: var(--input-border);
+ }
+
+
+ /* Modal Styles */
+ .modal {
+    /* ... existing styles ... */
+    background-color: var(--shadow-color-modal); /* USE VAR for overlay */
+ }
+ .modal-content { /* General modal content */
+     background-color: var(--modal-bg); /* USE VAR */
+     border: 1px solid var(--border-color); /* Add border */
+     box-shadow: 0 5px 15px var(--shadow-color); /* Use subtle shadow */
+     /* ... rest of existing styles ... */
+     transition: background-color 0.3s, border-color 0.3s;
+ }
+ #shortsModalContent { /* Specific modal content - inherits from .modal-content */
+     /* ... existing styles ... */
+     /* Overrides if necessary */
+     background-color: var(--modal-bg); /* Ensure it uses the var */
+ }
+
+ .close-button {
+      /* ... existing styles ... */
+      color: var(--close-button-color); /* USE VAR */
+ }
+ .close-button:hover {
+      color: var(--close-button-hover); /* USE VAR */
+ }
+ #modalVideo {
+     /* ... existing styles ... */
+     background-color: #000; /* Keep video player background black */
+ }
+
+ /* Shorts List Styling (Inside Modal) */
+ #shortsList {
+    /* ... existing styles ... */
+    /* No background change needed, parent modal handles it */
+ }
+ #shortsList .short-item {
+     border: 1px solid var(--medium-gray); /* USE VAR */
+     background-color: var(--bg-color); /* Use main dark background for item */
+     /* ... existing styles ... */
+     box-shadow: 0 1px 3px var(--shadow-color-light); /* USE VAR */
+     transition: background-color 0.3s, border-color 0.3s;
+}
+ #shortsList .short-time,
+ #shortsList .short-actions {
+      border-top: 1px dashed var(--border-color); /* USE VAR */
+ }
+ #shortsList .short-time input[type="text"] {
+      border: 1px solid var(--medium-gray); /* USE VAR */
+      background-color: var(--input-bg); /* Use input bg */
+      color: var(--text-color); /* Use text color */
+ }
+
+/* Update toggle text color */
+html[data-theme="dark"] .theme-switch-wrapper em {
+    color: var(--text-color);
 }
 
-/* Close button styles */
-.close-button {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: none;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-    color: #666;
-}
-
-.close-button:hover {
-    color: #333;
+/* Responsive: Adjust toggle position if needed */
+@media (max-width: 768px) {
+    .theme-switch-wrapper {
+        top: 10px;
+        right: 10px;
+    }
+    /* You might hide the "Toggle Dark Mode" text on small screens */
+    /* .theme-switch-wrapper em { display: none; } */
 }

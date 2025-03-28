@@ -5,375 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Responsive viewport -->
     <title>Video Shorts Generator</title>
     <!-- Consider linking a separate CSS file for better organization -->
-    <!-- <link rel="stylesheet" href="styles.css"> -->
-    <style>
-        :root {
-            --primary-color: #007bff;
-            --primary-hover: #0056b3;
-            --danger-color: #dc3545;
-            --danger-hover: #c82333;
-            --success-color: #28a745;
-            --warning-color: #ffc107;
-            --info-color: #17a2b8;
-            --processing-color: orange;
-            --failed-color: var(--danger-color);
-            --completed-color: var(--success-color);
-            --pending-color: gray;
-            --queued-color: var(--info-color);
-            --pending-reprocess-color: purple;
-            --text-color: #333;
-            --light-gray: #f8f9fa;
-            --medium-gray: #e9ecef;
-            --border-color: #dee2e6;
-            --border-radius: 5px; /* Slightly increased for softer look */
-            --box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            --box-shadow-light: 0 1px 3px rgba(0,0,0,0.08);
-        }
-
-        /* Basic Reset & Box Sizing */
-        *, *::before, *::after {
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 20px;
-            line-height: 1.6;
-            background-color: var(--light-gray);
-            color: var(--text-color);
-        }
-
-        /* Sections */
-        #uploadSection, #videosTableContainer {
-             background-color: #fff;
-             padding: 20px;
-             margin-bottom: 25px;
-             border-radius: var(--border-radius);
-             box-shadow: var(--box-shadow);
-        }
-
-        h1, h2 {
-            color: var(--text-color);
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 10px;
-            margin-top: 0; /* Remove default top margin */
-            margin-bottom: 20px;
-        }
-        h1 { font-size: 1.8rem; }
-        h2 { font-size: 1.5rem; }
-
-        hr { border: 0; border-top: 1px solid var(--border-color); margin: 30px 0; }
-
-        label {
-             margin-right: 10px;
-             font-weight: bold;
-             display: block; /* Default to block for stacking */
-             margin-bottom: 5px;
-        }
-
-        input[type="file"], input[type="text"], button {
-             padding: 10px 15px; /* Increased padding */
-             margin: 5px 0;
-             border-radius: var(--border-radius);
-             border: 1px solid var(--border-color);
-             font-size: 1rem;
-             vertical-align: middle; /* Align better with text/other elements */
-        }
-         input[type="text"] {
-             width: 100%; /* Default to full width, containers will manage */
-         }
-         input[type="file"] {
-              width: 100%;
-              border: 1px dashed var(--border-color); /* Style file input */
-              background-color: var(--light-gray);
-              cursor: pointer;
-         }
-         input[type="file"]:hover {
-             border-color: var(--primary-color);
-         }
-
-        button {
-             cursor: pointer;
-             background-color: var(--primary-color);
-             color: white;
-             border: none;
-             transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
-        }
-        button:hover:not(:disabled) { background-color: var(--primary-hover); }
-        button:disabled { background-color: #cccccc; cursor: not-allowed; opacity: 0.7; }
-        button.danger { background-color: var(--danger-color); }
-        button.danger:hover:not(:disabled) { background-color: var(--danger-hover); }
-
-        .status {
-             margin-top: 15px;
-             font-style: italic;
-             color: #555;
-             min-height: 1.2em;
-             padding: 10px;
-             border-radius: var(--border-radius);
-             border: 1px solid transparent; /* Reserve space for border */
-        }
-        .status-processing { color: var(--processing-color); font-weight: bold; background-color: #fff8e1; border-color: var(--processing-color);}
-        .status-completed { color: var(--completed-color); font-weight: bold; background-color: #e9f7ef; border-color: var(--completed-color);}
-        .status-failed { color: var(--failed-color); font-weight: bold; background-color: #fdeded; border-color: var(--failed-color);}
-        .status-pending { color: var(--pending-color); background-color: #f8f9fa; border-color: var(--pending-color);}
-        .status-queued { color: var(--queued-color); font-weight: bold; background-color: #e3f2fd; border-color: var(--info-color);}
-        .status-pending_reprocess { color: var(--pending-reprocess-color); font-weight: bold; background-color: #f3e5f5; border-color: var(--pending-reprocess-color);}
-        .status-info { color: var(--info-color); background-color: #e3f2fd; border-color: var(--info-color);} /* Added for general info */
-
-        small { font-size: 0.85em; color: #555; display: block; margin-top: 2px; word-break: break-all; }
-
-        /* Upload Form Specifics */
-         #uploadForm {
-              display: flex;
-              flex-direction: column;
-              gap: 15px;
-         }
-         #uploadForm label {
-              margin-bottom: 0; /* Remove bottom margin as gap handles it */
-         }
-         #uploadForm button {
-              margin-top: 10px;
-              align-self: flex-start; /* Prevent button stretching full width */
-         }
-
-        /* Table styling */
-        #videosTableContainer {
-             overflow-x: auto; /* Add horizontal scroll for small screens */
-             padding: 0; /* Remove container padding, table handles it */
-        }
-        #videosTable {
-             width: 100%;
-             border-collapse: collapse;
-             /* Removed margin-top as container handles spacing */
-             background-color: #fff;
-             /* Removed shadow/radius from table, container has it */
-             /* overflow: hidden; /* Can cause issues with shadows on scrolled content */
-        }
-        #videosTable th, #videosTable td {
-             border: 1px solid var(--border-color);
-             padding: 12px 15px;
-             text-align: left;
-             vertical-align: middle; /* Align content vertically */
-             word-break: break-word; /* Allow long words to break */
-        }
-        #videosTable th {
-             background-color: var(--medium-gray);
-             font-weight: bold;
-             white-space: nowrap; /* Prevent headers from wrapping */
-        }
-        /* Column widths - Adjust as needed */
-        #videosTable th:nth-child(1), #videosTable td:nth-child(1) { width: 5%; text-align: center; } /* ID */
-        #videosTable th:nth-child(2), #videosTable td:nth-child(2) { width: 30%; } /* Details */
-        #videosTable th:nth-child(3), #videosTable td:nth-child(3) { width: 10%; text-align: center; } /* Full Video */
-        #videosTable th:nth-child(4), #videosTable td:nth-child(4) { width: 15%; text-align: center; } /* Shorts Button */
-        #videosTable th:nth-child(5), #videosTable td:nth-child(5) { width: 40%; } /* Actions & Subtitles */
-
-        #videosTable td .button-group {
-             display: flex;
-             flex-wrap: wrap;
-             gap: 8px; /* Increased gap */
-             align-items: center;
-        }
-        #videosTable td .button-group button {
-             margin: 0; /* Remove default margin */
-             padding: 6px 10px; /* Slightly smaller buttons in table */
-             font-size: 0.9em;
-        }
-
-        /* Subtitle Upload Form Styling (within table) */
-        .subtitle-upload-form {
-            margin-top: 10px; /* Space above this form */
-            display: flex;
-            flex-wrap: wrap; /* Allow wrapping */
-            align-items: center;
-            gap: 8px;
-            border-top: 1px solid var(--medium-gray);
-            padding-top: 10px;
-        }
-        .subtitle-upload-form label {
-             font-weight: normal;
-             font-size: 0.9em;
-             margin: 0; /* Remove default label margins */
-             flex-shrink: 0; /* Prevent label from shrinking */
-             display: inline-block; /* Allow inline display */
-             width: auto; /* Override block display */
-        }
-        .subtitle-upload-form input[type="file"] {
-             margin: 0;
-             padding: 6px;
-             flex-grow: 1; /* Allow file input to take available space */
-             font-size: 0.9em;
-             width: auto; /* Override 100% width */
-             min-width: 150px; /* Ensure usability */
-             border-style: solid; /* Override dashed */
-             background-color: white;
-        }
-         .subtitle-upload-form button {
-             margin: 0;
-             padding: 6px 10px;
-             font-size: 0.9em;
-             flex-shrink: 0; /* Prevent button from shrinking */
-         }
-
-         /* Modal Styles */
-         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); /* Darker overlay */ animation: fadeIn 0.3s; }
-         .modal-content { background-color: #fff; margin: 5% auto; padding: 25px; border: none; width: 90%; max-width: 800px; position: relative; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s; }
-         .close-button { position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; line-height: 1; background: none; border: none; padding: 0; }
-         .close-button:hover { color: var(--text-color); }
-         #modalVideo { width: 100%; max-height: 70vh; height: auto; background-color: #000; border-radius: var(--border-radius); display: block; } /* Added display block */
-
-         /* Shorts List Styling (Inside Modal) */
-         #shortsList { margin-top: 20px; }
-         #shortsList .short-item {
-             border: 1px solid var(--medium-gray); /* Use border instead of just bottom */
-             background-color: var(--light-gray);
-             padding: 15px;
-             margin-bottom: 15px; /* Space between items */
-             border-radius: var(--border-radius);
-             box-shadow: var(--box-shadow-light);
-        }
-         /* #shortsList .short-item:last-child { border-bottom: 1px solid var(--medium-gray); } */ /* Remove last-child rule */
-         #shortsList p { margin: 5px 0 10px 0; }
-         #shortsList .short-info strong { font-size: 1.1em;}
-         #shortsList .short-time {
-              display: flex;
-              flex-wrap: wrap; /* Allow wrapping on small screens */
-              align-items: center;
-              gap: 8px;
-              margin-bottom: 10px;
-              border-top: 1px dashed var(--border-color);
-              padding-top: 10px;
-              margin-top: 10px;
-         }
-         #shortsList .short-time label {
-             font-weight: normal;
-             margin: 0;
-             font-size: 0.9em;
-             display: inline-block; /* Override block */
-             width: auto; /* Override block */
-         }
-         #shortsList .short-time input[type="text"] {
-             padding: 6px 8px;
-             font-size: 0.9em;
-             margin: 0;
-             border: 1px solid var(--medium-gray);
-             /* Flexible width: takes available space, min/max limits */
-             flex: 1 1 auto;
-             min-width: 75px; /* Ensure usable width */
-             max-width: 100px; /* Prevent growing too large */
-             width: auto; /* Override 100% default */
-         }
-         #shortsList .short-time button {
-             padding: 6px 10px;
-             font-size: 0.9em;
-             margin: 0;
-             flex-shrink: 0; /* Prevent shrinking */
-         }
-         #shortsList .short-actions {
-             margin-top: 10px;
-             display: flex;
-             flex-wrap: wrap;
-             gap: 8px;
-             padding-top: 10px;
-             border-top: 1px dashed var(--border-color);
-         }
-         #shortsList .short-actions button {
-             margin: 0;
-             padding: 6px 10px;
-             font-size: 0.9em;
-         }
-         /* Button added dynamically for suggesting more */
-         #shortsList > button {
-             margin-top: 15px;
-         }
-
-
-         /* Animations */
-         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-         @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-        /* --- Responsive Adjustments --- */
-        @media (max-width: 768px) {
-            body {
-                margin: 10px; /* Reduced margin */
-                font-size: 0.95rem; /* Slightly smaller base font */
-            }
-
-            h1 { font-size: 1.6rem; }
-            h2 { font-size: 1.3rem; }
-
-            #uploadSection, #videosTableContainer {
-                 padding: 15px; /* Reduced padding */
-                 margin-bottom: 20px;
-            }
-
-            input[type="file"], input[type="text"], button {
-                 padding: 8px 12px; /* Slightly reduce padding */
-                 font-size: 0.95rem;
-            }
-
-            /* Table adjustments */
-            #videosTable th, #videosTable td {
-                 padding: 8px; /* Reduced cell padding */
-            }
-             /* Example: Adjust specific columns if needed, e.g., make ID column smaller */
-             #videosTable th:nth-child(1), #videosTable td:nth-child(1) { width: auto; font-size: 0.85em; } /* Let ID shrink */
-             #videosTable th:nth-child(3), #videosTable td:nth-child(3), /* Play */
-             #videosTable th:nth-child(4), #videosTable td:nth-child(4) { width: auto; } /* Shorts */
-             /* Give more space to Details and Actions */
-             #videosTable th:nth-child(2), #videosTable td:nth-child(2) { min-width: 120px; } /* Details */
-             #videosTable th:nth-child(5), #videosTable td:nth-child(5) { min-width: 200px; } /* Actions */
-
-
-            #videosTable td .button-group {
-                 gap: 5px; /* Slightly reduce gap */
-            }
-            #videosTable td .button-group button {
-                 padding: 5px 8px;
-                 font-size: 0.85em;
-            }
-             .subtitle-upload-form {
-                  gap: 5px;
-             }
-             .subtitle-upload-form input[type="file"] {
-                  min-width: 120px; /* Adjust min-width if needed */
-             }
-             .subtitle-upload-form button {
-                 padding: 5px 8px;
-                 font-size: 0.85em;
-             }
-
-
-            /* Modal adjustments */
-            .modal-content {
-                padding: 20px; /* Reduce modal padding */
-                margin: 10% auto; /* Adjust vertical margin */
-            }
-
-            /* Shorts List inside modal */
-            #shortsList .short-item {
-                padding: 10px;
-            }
-            #shortsList .short-time { gap: 5px; }
-            #shortsList .short-time input[type="text"] {
-                 min-width: 65px; /* Further reduce min width */
-                 max-width: 90px;
-            }
-            #shortsList .short-actions { gap: 5px; }
-            #shortsList .short-actions button,
-            #shortsList .short-time button {
-                padding: 5px 8px;
-                font-size: 0.85em;
-            }
-
-        } /* End of media query */
-
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <h1>Video Shorts Generator</h1>
-
+    <!-- Dark Mode Toggle Start -->
+    <div class="theme-switch-wrapper">
+        <label class="theme-switch" for="darkModeToggle">
+            <input type="checkbox" id="darkModeToggle" />
+            <span class="slider round"></span>
+        </label>
+        <em>Toggle Dark Mode</em>
+    </div>
     <!-- Added container div for upload section styling -->
     <div id="uploadSectionContainer">
         <div id="uploadSection">
@@ -444,7 +87,42 @@
         let currentModalVideoId = null;
         let refreshIntervalId = null; // Interval ID for clearing
         const REFRESH_INTERVAL_MS = 7000; // Refresh every 7 seconds
+        const toggleSwitch = document.getElementById('darkModeToggle');
+        const currentTheme = localStorage.getItem('theme');
 
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            if (toggleSwitch) {
+                 toggleSwitch.checked = theme === 'dark';
+            }
+             // Optional: Dispatch an event if other components need to react
+             // document.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: theme } }));
+        }
+
+        // Apply the saved theme or the preferred scheme on initial load
+        if (currentTheme) {
+            setTheme(currentTheme);
+        } else {
+            // Check for OS preference
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            setTheme(prefersDark ? 'dark' : 'light');
+        }
+
+        // Listener for the toggle switch
+        if (toggleSwitch) {
+            toggleSwitch.addEventListener('change', function(e) {
+                setTheme(e.target.checked ? 'dark' : 'light');
+            });
+        }
+
+        // Optional: Listen for OS preference changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            // Only change if no theme is manually set in localStorage
+            if (!localStorage.getItem('theme')) {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        });
         // --- Utility Functions ---
         function setStatus(elementId, message, isError = false, duration = 5000) {
             const element = document.getElementById(elementId);

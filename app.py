@@ -184,6 +184,7 @@ def get_suggested_segments(subtitle_content_text):
             "Analyze the following video subtitle text and suggest 3-5 engaging segments suitable for YouTube Shorts (typically 50-60 seconds). "
             "Focus on segments with clear topics, questions, or strong statements.\n\n"
             "If a logical segment is significantly longer than 60 seconds, try to break it into meaningful parts (e.g., 'Topic X Part 1', 'Topic X Part 2'), ensuring each part is still engaging on its own.\n\n"
+            "if the duration of the whole video is more than 20 minutes, please suggest at least 15 segments.\n\n"
             f"{time_guidance}"
             "Return the result *ONLY* as a valid JSON array. Each object in the array must contain:\n"
             "- 'shortname': A concise, unique, descriptive name for the clip (under 50 characters).\n"
