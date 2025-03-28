@@ -18,6 +18,8 @@ import logging
 import re # Import re for time validation
 from flask_migrate import Migrate
 import time # Import time for delays
+# Removed sqlalchemy MetaData import as it's not needed without naming conventions for this specific change
+# from sqlalchemy import MetaData
 
 app = Flask(__name__, static_url_path='', static_folder='static')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///shorts.db'
@@ -25,7 +27,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Increase timeout for longer operations if needed
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_timeout': 30, 'pool_recycle': 280}
 
-db = SQLAlchemy(app)
+# Removed metadata and naming convention section
+db = SQLAlchemy(app) # Use default SQLAlchemy initialization
 migrate = Migrate(app, db)
 
 # --- Directories (Ensure SUBTITLES_DIR is included) ---
@@ -48,6 +51,8 @@ class Video(db.Model):
     video_title = db.Column(db.String(512))
     transcript = db.Column(db.Text) # Stores formatted Whisper transcript OR indicator like "Using uploaded..."
     uploaded_subtitle_filename = db.Column(db.String(512), nullable=True) # Existing field
+    # REMOVED: error_message = db.Column(db.Text, nullable=True)
+
 
 class ShortSegment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -59,6 +64,8 @@ class ShortSegment(db.Model):
     end_time = db.Column(db.String(12), nullable=False) # Allow slightly longer format HHH:MM:SS
     short_filename = db.Column(db.String(512))
     status = db.Column(db.String(20), default='pending', index=True)
+    # REMOVED: error_message = db.Column(db.Text, nullable=True)
+
 
 with app.app_context():
     db.create_all()
@@ -320,11 +327,20 @@ def parse_segments(response_text):
         return []
 
 # --- Core Processing Logic ---
-def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=False):
+def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=False, zoom_factor=2.0):
     """Core logic for processing/reprocessing a video. Should run in a separate thread."""
+    # Validate zoom factor early, default if needed
+    try:
+        zoom_factor = float(zoom_factor) if zoom_factor is not None else 2.0
+        if zoom_factor < 1.0: raise ValueError("Zoom factor must be >= 1.0")
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid zoom factor '{zoom_factor}' received for video {video_id}. Using default 2.0.")
+        zoom_factor = 2.0
+
     with app.app_context(): # Ensure DB access within thread
         video = None # Initialize
         session = db.session # Use scoped session
+        # REMOVED: processing_error_message = None # Store error message for DB
         try:
             video = session.get(Video, video_id) # Use session.get for primary key lookup
             if not video:
@@ -338,8 +354,9 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
                  return
 
             video.status = 'processing'
+            # REMOVED: video.error_message = None # Clear previous error
             session.commit()
-            logger.info(f"Starting processing for video {video_id}. Force: {force_reprocess}, Use Subs Hint: {use_uploaded_subtitle}")
+            logger.info(f"Starting processing for video {video_id}. Force: {force_reprocess}, Use Subs Hint: {use_uploaded_subtitle}, Zoom: {zoom_factor}")
 
             original_video_path = os.path.join(VIDEOS_DIR, video.original_filename)
             if not os.path.exists(original_video_path):
@@ -388,7 +405,7 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
                      logger.info("Attempting transcript generation only (skip_editing=True).")
                      try:
                         _, whisper_transcript_result, parsed_subtitle_groups = process_video(
-                            original_video_path, edited_filename, skip_editing=True, subtitle_file_path=None
+                            original_video_path, edited_filename, skip_editing=True, subtitle_file_path=None, zoom_factor=zoom_factor # Pass zoom even if skipping
                         )
                         if whisper_transcript_result:
                              logger.info(f"Transcript generation completed (skip_editing=True).")
@@ -397,6 +414,7 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
                              logger.warning("Transcript generation (skip_editing=True) returned no data.")
                      except Exception as e:
                          logger.error(f"Transcript generation failed even with skip_editing=True: {e}", exc_info=True)
+                         # Don't raise here, just proceed without transcript if skip_editing
                  elif subtitle_source == "uploaded":
                       logger.info("Using uploaded subtitles, skipping transcript generation. Parsing for content.")
                       # Need to parse the subtitle file to get content for Gemini later
@@ -414,14 +432,15 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
                       video.edited_filename = edited_filename
 
             else: # Needs editing (or re-editing)
-                 logger.info(f"Running full video processing (editing). Subtitle source hint: {subtitle_source}")
+                 logger.info(f"Running full video processing (editing). Subtitle source hint: {subtitle_source}, Zoom: {zoom_factor}")
                  try:
                      # Call process_video to edit and get transcript data
                      edited_video_path_result, whisper_transcript_result, parsed_subtitle_groups = process_video(
                          original_video_path,
                          edited_filename,
                          skip_editing=False, # We are editing now
-                         subtitle_file_path=subtitle_file_path # Pass the path if determined
+                         subtitle_file_path=subtitle_file_path, # Pass the path if determined
+                         zoom_factor=zoom_factor # Pass the zoom factor
                      )
                      # Update DB with the actual filename produced
                      video.edited_filename = os.path.basename(edited_video_path_result)
@@ -533,17 +552,24 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
 
         except FileNotFoundError as e:
              logger.error(f"File not found error processing video {video_id}: {e}", exc_info=True)
+             # REMOVED: processing_error_message = str(e)
              if video: video.status = 'failed'
         except (subprocess.CalledProcessError, ValueError, RuntimeError) as e: # Catch ffmpeg, value errors, etc.
              logger.error(f"Subprocess or Value error during processing video {video_id}: {e}", exc_info=True)
+             # REMOVED: processing_error_message = str(e)
              if video: video.status = 'failed'
         except Exception as e: # Catch all other exceptions
             logger.error(f"General error processing video {video_id}: {e}", exc_info=True)
+            # REMOVED: processing_error_message = str(e)
             if video: video.status = 'failed'
         finally:
             # Commit final status (completed or failed)
             if video and video.status in ['failed', 'completed']:
                  try:
+                     # REMOVED: Error message setting block
+                     # if video.status == 'failed' and processing_error_message:
+                         # Store truncated error message
+                         # video.error_message = processing_error_message[:1024] # Limit length
                      session.commit()
                  except Exception as db_err:
                      logger.error(f"Failed to commit final status '{video.status}' for video {video_id}: {db_err}")
@@ -551,22 +577,22 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
             session.close()
 
 
-def process_uploaded_video(video_id):
+def process_uploaded_video(video_id, zoom_factor=2.0):
     """Handles the initial processing after video upload (detects subs)."""
-    logger.info(f"Queuing initial processing for video {video_id}.")
-    _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=False) # use_uploaded_subtitle=False lets core decide
+    logger.info(f"Queuing initial processing for video {video_id} with zoom {zoom_factor}.")
+    _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=False, zoom_factor=zoom_factor) # use_uploaded_subtitle=False lets core decide
 
-def reprocess_video_with_subtitle(video_id):
+def reprocess_video_with_subtitle(video_id, zoom_factor=2.0):
     """Forces reprocessing, specifically *using* the uploaded subtitle file."""
-    logger.info(f"Queuing reprocessing *with* subtitles for video {video_id}.")
-    _process_video_core(video_id, force_reprocess=True, use_uploaded_subtitle=True) # force_reprocess=True, use_uploaded_subtitle=True
+    logger.info(f"Queuing reprocessing *with* subtitles for video {video_id} using zoom {zoom_factor}.")
+    _process_video_core(video_id, force_reprocess=True, use_uploaded_subtitle=True, zoom_factor=zoom_factor) # force_reprocess=True, use_uploaded_subtitle=True
 
 # --- New Background Task Function ---
-def trigger_full_reprocessing(video_id):
+def trigger_full_reprocessing(video_id, zoom_factor=2.0):
     """Forces reprocessing, auto-detecting subtitle source."""
-    logger.info(f"Queuing full reprocessing (auto-detect subs) for video {video_id}.")
+    logger.info(f"Queuing full reprocessing (auto-detect subs) for video {video_id} using zoom {zoom_factor}.")
     # force_reprocess=True ensures it runs, use_uploaded_subtitle=False lets core check filename
-    _process_video_core(video_id, force_reprocess=True, use_uploaded_subtitle=False)
+    _process_video_core(video_id, force_reprocess=True, use_uploaded_subtitle=False, zoom_factor=zoom_factor)
 
 # --- Renamed Background Task Function ---
 def regenerate_suggestions(video_id):
@@ -647,17 +673,20 @@ def regenerate_suggestions(video_id):
             # Ensure status is completed if it wasn't changed
             if video.status != 'completed':
                  video.status = 'completed'
+                 # REMOVED: video.error_message = None # Clear error if completing successfully now
                  session.commit()
             logger.info(f"Suggestion regeneration finished for video {video_id}. Added {added_count} new suggestions.")
 
         except Exception as e:
             logger.error(f"Error regenerating suggestions for video {video_id}: {e}", exc_info=True)
             if video: # Check if video object exists
-                # Don't mark video as failed just for suggestion failure? Or maybe?
-                # Let's just log the error for now.
-                # video.status = 'failed'
-                # try: session.commit()
-                # except Exception as db_err: logger.error(...)
+                # Don't mark video as failed just for suggestion failure.
+                # Just log the error and ensure status isn't stuck on processing.
+                if video.status == 'processing': video.status = 'completed' # Revert if stuck
+                try: session.commit()
+                except Exception as db_err:
+                    logger.error(f"Failed to commit status after suggestion regen error for {video_id}: {db_err}")
+                    session.rollback()
                 pass
         finally:
             session.close()
@@ -669,6 +698,7 @@ def process_short(video_id, short_id):
     with app.app_context(): # Ensure DB access within thread
         short = None
         session = db.session # Use scoped session
+        # REMOVED: processing_error_message = None # Store error for DB
         try:
             short = session.get(ShortSegment, short_id)
             if not short:
@@ -676,6 +706,7 @@ def process_short(video_id, short_id):
                  return
             if short.video_id != video_id:
                  logger.error(f"Short {short_id} does not belong to video {video_id}.")
+                 # REMOVED: processing_error_message = "Mismatched video ID."
                  short.status = 'failed' # Mark as failed
                  session.commit()
                  return
@@ -690,6 +721,7 @@ def process_short(video_id, short_id):
                  return
 
             short.status = 'processing'
+            # REMOVED: short.error_message = None # Clear previous error
             session.commit()
             logger.info(f"Starting short creation for short {short_id} (Video {video_id}).")
 
@@ -765,14 +797,17 @@ def process_short(video_id, short_id):
 
         except FileNotFoundError as e:
              logger.error(f"File not found error creating short {short_id}: {e}", exc_info=True)
+             # REMOVED: processing_error_message = str(e)
              if short: short.status = 'failed'
         except ValueError as e: # Catch invalid duration, status errors etc.
              logger.error(f"Value error creating short {short_id}: {e}", exc_info=True)
+             # REMOVED: processing_error_message = str(e)
              if short: short.status = 'failed'
         except (subprocess.CalledProcessError, RuntimeError) as e: # Catch ffmpeg errors or file creation errors
              # Log stderr from the exception if available
              stderr_output = e.stderr if hasattr(e, 'stderr') else 'N/A'
              logger.error(f"FFmpeg/Runtime error for short {short_id}. Error: {e}, FFmpeg stderr: {stderr_output}", exc_info=True)
+             # REMOVED: processing_error_message = f"FFmpeg Error: {e}. Stderr: {stderr_output}"
              if short:
                  short.status = 'failed'
                  short.short_filename = None # Clear filename on failure
@@ -785,6 +820,7 @@ def process_short(video_id, short_id):
                          logger.warning(f"Could not delete potentially corrupted short file: {short_path}")
         except Exception as e: # Catch-all for other unexpected errors
             logger.error(f"General error creating short {short_id}: {e}", exc_info=True)
+            # REMOVED: processing_error_message = str(e)
             if short:
                  short.status = 'failed'
                  short.short_filename = None # Ensure filename is cleared
@@ -792,6 +828,9 @@ def process_short(video_id, short_id):
             # Commit status change if an error occurred and short object exists
             if short and short.status == 'failed':
                 try:
+                    # REMOVED: Error message setting block
+                    # if processing_error_message:
+                    #      short.error_message = processing_error_message[:1024] # Truncate
                     session.commit()
                 except Exception as db_err:
                     logger.error(f"Failed to commit 'failed' status for short {short_id}: {db_err}")
@@ -835,18 +874,18 @@ def start_task(task_key, target_func, args_tuple):
             del active_tasks[k]
             logger.debug(f"Cleaned up finished task: {k}")
 
-        logger.info(f"Starting background task: {task_key} for function {target_func.__name__}")
+        logger.info(f"Starting background task: {task_key} for function {target_func.__name__} with args {args_tuple}")
         thread = threading.Thread(target=target_func, args=args_tuple, name=task_key)
         active_tasks[task_key] = thread
         thread.start()
         return True # Indicate task started
 
-def process_uploaded_video_with_subtitle(video_id):
+def process_uploaded_video_with_subtitle(video_id, zoom_factor=2.0):
     """Handles initial processing when subtitle WAS provided during upload."""
-    logger.info(f"Queuing initial processing (with subs hint) for video {video_id}.")
+    logger.info(f"Queuing initial processing (with subs hint) for video {video_id} using zoom {zoom_factor}.")
     # Treat it like a reprocess to ensure the subtitle file is definitely used
     # and video editing happens (as opposed to just transcription/parsing)
-    _process_video_core(video_id, force_reprocess=True, use_uploaded_subtitle=True)
+    _process_video_core(video_id, force_reprocess=True, use_uploaded_subtitle=True, zoom_factor=zoom_factor)
 
 # --- Endpoints ---
 
@@ -856,6 +895,17 @@ def upload_video_endpoint(): # Renamed endpoint function
         return jsonify({'error': 'No video file provided'}), 400
     video_file = request.files['video']
     subtitle_file = request.files.get('subtitle') # Use .get for optional file
+    zoom_factor_str = request.form.get('zoom_factor', default='2.0') # Get zoom factor as string
+
+    # Try converting zoom factor, use default on failure
+    try:
+        zoom_factor = float(zoom_factor_str)
+        if zoom_factor < 1.0:
+            logger.warning(f"Invalid zoom factor '{zoom_factor_str}' (must be >= 1.0). Using default 2.0.")
+            zoom_factor = 2.0
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid zoom factor value '{zoom_factor_str}'. Using default 2.0.")
+        zoom_factor = 2.0
 
     if not video_file or video_file.filename == '':
         return jsonify({'error': 'No selected video file or empty filename'}), 400
@@ -867,6 +917,8 @@ def upload_video_endpoint(): # Renamed endpoint function
     session = db.session # Use scoped session
 
     try:
+        logger.info(f"Upload requested for {video_filename} with zoom factor: {zoom_factor}")
+
         # --- 1. Save Video File ---
         # Ensure filename uniqueness? Or just overwrite? Overwriting for now.
         video_path = os.path.join(VIDEOS_DIR, video_filename) # Path for saving
@@ -881,6 +933,7 @@ def upload_video_endpoint(): # Renamed endpoint function
             video.status = 'pending'
             video.edited_filename = None
             video.transcript = None # Clear old transcript/indicator
+            # REMOVED: video.error_message = None # Clear error on new upload
 
             # Clean up associated files before potentially saving new ones
             if video.uploaded_subtitle_filename:
@@ -940,11 +993,12 @@ def upload_video_endpoint(): # Renamed endpoint function
 
         # --- 4. Start Background Processing ---
         task_key = f"video_{video_id}"
-        start_task(task_key, start_processing_func, (video_id,))
+        # Pass the validated or default zoom factor to the task
+        start_task(task_key, start_processing_func, (video_id, zoom_factor))
 
         return jsonify({
             'video_id': video_id,
-            'message': f'Upload successful. Processing {"with subtitle" if subtitle_saved_filename else "(auto-detecting subs)"} started.'
+            'message': f'Upload successful. Processing {"with subtitle" if subtitle_saved_filename else "(auto-detecting subs)"} started (Zoom: {zoom_factor}).'
             }), 202
 
     except Exception as e:
@@ -1016,15 +1070,19 @@ def upload_subtitle(video_id):
         # --- Update Database ---
         video.uploaded_subtitle_filename = new_filename
         video.status = 'pending_reprocess' # Indicate it needs reprocessing with the new subs
+        # REMOVED: video.error_message = None # Clear any previous error
         # Clear existing transcript if switching to uploaded subs
         video.transcript = f"Processing with uploaded subtitle: {new_filename}"
         session.commit()
 
+        # Q: Should reprocessing use the original zoom factor or a new one?
+        # A: Using default (2.0) for simplicity for this trigger.
+        reprocess_zoom_factor = 2.0
         # --- Start Reprocessing ---
-        logger.info(f"Triggering reprocessing for video {video_id} with new subtitle.")
+        logger.info(f"Triggering reprocessing for video {video_id} with new subtitle (Zoom: {reprocess_zoom_factor}).")
         task_key = f"video_{video_id}" # Use the same video task key
-        # Use the function that forces using uploaded subs
-        start_task(task_key, reprocess_video_with_subtitle, (video_id,))
+        # Use the function that forces using uploaded subs, passing the decided zoom factor
+        start_task(task_key, reprocess_video_with_subtitle, (video_id, reprocess_zoom_factor))
 
         return jsonify({'message': f'Subtitle uploaded successfully for video {video.id}. Reprocessing started.', 'subtitle_filename': new_filename}), 202
 
@@ -1062,15 +1120,19 @@ def trigger_reprocess_endpoint(video_id):
         session.close()
         return jsonify({'error': f'Video status is {video.status}. Cannot start reprocessing now.'}), 400
 
-    logger.info(f"Explicit trigger request for reprocessing video {video_id} *with* subtitles.")
+    # Use default zoom for this trigger
+    reprocess_zoom_factor = 2.0
+
+    logger.info(f"Explicit trigger request for reprocessing video {video_id} *with* subtitles (Zoom: {reprocess_zoom_factor}).")
     # Update status to indicate reprocessing is needed
     video.status = 'pending_reprocess'
+    # REMOVED: video.error_message = None # Clear previous error
     session.commit()
 
     # Start the reprocessing task (forcing use of subs)
     task_key = f"video_{video_id}"
-    if start_task(task_key, reprocess_video_with_subtitle, (video_id,)):
-         message = 'Reprocessing with subtitle started.'
+    if start_task(task_key, reprocess_video_with_subtitle, (video_id, reprocess_zoom_factor)):
+         message = f'Reprocessing with subtitle started (Zoom: {reprocess_zoom_factor}).'
          status_code = 202
     else:
          message = 'Reprocessing task is already running or queued.'
@@ -1093,15 +1155,19 @@ def reprocess_auto_detect_endpoint(video_id):
         session.close()
         return jsonify({'error': f'Video status is {video.status}. Cannot start reprocessing now.'}), 400
 
-    logger.info(f"Request to reprocess video {video_id} (auto-detecting subtitle source).")
+    # Use default zoom for this trigger
+    reprocess_zoom_factor = 2.0
+
+    logger.info(f"Request to reprocess video {video_id} (auto-detecting subtitle source, Zoom: {reprocess_zoom_factor}).")
     # Update status to indicate reprocessing is needed
     video.status = 'pending_reprocess'
+    # REMOVED: video.error_message = None # Clear previous error
     session.commit()
 
     # Start the full reprocessing task (auto-detecting subs)
     task_key = f"video_{video_id}"
-    if start_task(task_key, trigger_full_reprocessing, (video_id,)):
-         message = 'Full reprocessing started (auto-detecting subtitle source).'
+    if start_task(task_key, trigger_full_reprocessing, (video_id, reprocess_zoom_factor)):
+         message = f'Full reprocessing started (auto-detecting subtitle source, Zoom: {reprocess_zoom_factor}).'
          status_code = 202
     else:
          message = 'Reprocessing task is already running or queued.'
@@ -1130,6 +1196,7 @@ def get_videos():
                     'start_time': s.start_time,
                     'end_time': s.end_time,
                     'status': s.status,
+                    # REMOVED: 'error_message': s.error_message, # Include short error message
                     # Generate URL only if file likely exists
                     'short_url': url_for('serve_short', filename=s.short_filename, _external=True) if s.status == 'completed' and s.short_filename and os.path.exists(os.path.join(EDITED_SHORTS_DIR, s.short_filename)) else None
                 } for s in shorts]
@@ -1145,6 +1212,7 @@ def get_videos():
                 'title': v.video_title or os.path.splitext(v.original_filename)[0].replace('_', ' ').title(), # Fallback title
                 'original_filename': v.original_filename,
                 'status': v.status,
+                # REMOVED: 'error_message': v.error_message, # Include video error message
                 'uploaded_subtitle_filename': v.uploaded_subtitle_filename,
                 # Provide URL only if file exists and status allows playback
                 'edited_video_url': url_for('serve_edited_video', filename=v.edited_filename, _external=True) if v.status == 'completed' and edited_video_exists else None,
@@ -1154,7 +1222,8 @@ def get_videos():
         return jsonify(output)
     except Exception as e:
          logger.error(f"Error fetching video list: {e}", exc_info=True)
-         return jsonify({"error": "Failed to fetch video list"}), 500
+         # Provide a slightly more specific error if possible, but avoid leaking too much detail
+         return jsonify({"error": "Failed to process video list on server"}), 500
 
 
 @app.route('/videos/<int:video_id>/shorts/<int:short_id>/create', methods=['POST'])
@@ -1177,6 +1246,7 @@ def create_short_endpoint(video_id, short_id): # Renamed to avoid conflict
 
     # Update status to queued immediately
     short.status = 'queued'
+    # REMOVED: short.error_message = None # Clear previous error
     session.commit()
 
     # Start processing in background thread
@@ -1308,10 +1378,24 @@ def update_short(video_id, short_id):
                          logger.error(f"Could not delete old file {old_file}: {e}")
                  short.short_filename = None # Clear filename in DB
 
+        # If short failed, updating times should also reset status to pending
+        elif short.status == 'failed':
+            logger.info(f"Times updated for failed short {short_id}. Resetting status to 'pending'.")
+            short.status = 'pending'
+            # REMOVED: short.error_message = None # Clear error message
+            status_reset_msg = ' Status reset to pending.'
+
         session.commit()
-        # Prepare response data
+        # Prepare response data including potentially updated status and cleared error
         response_short_data = {
-             'id': short.id, 'start_time': short.start_time, 'end_time': short.end_time, 'status': short.status
+             'id': short.id,
+             'short_name': short.short_name,
+             'short_description': short.short_description,
+             'start_time': short.start_time,
+             'end_time': short.end_time,
+             'status': short.status,
+             # REMOVED: 'error_message': short.error_message, # Should be None if reset
+             'short_url': url_for('serve_short', filename=short.short_filename, _external=True) if short.status == 'completed' and short.short_filename else None
         }
         message = f'Short updated successfully.{status_reset_msg}'
         status_code = 200
@@ -1363,7 +1447,7 @@ def refresh_shorts_endpoint(video_id): # Renamed endpoint function to refresh_sh
 
     if start_task(task_key, regenerate_suggestions, (video_id,)):
         # Let the thread handle status updates
-        message = 'Suggestion regeneration queued. Suggestions will be updated shortly.'
+        message = 'Suggestion regeneration queued. Non-completed suggestions will be replaced shortly.'
         status_code = 202
     else:
         message = 'Suggestion regeneration task is already running or queued.'
@@ -1405,6 +1489,7 @@ def recreate_short_endpoint(video_id, short_id): # Renamed endpoint function
 
     # --- Queue Task ---
     short.status = 'queued' # Use queued status
+    # REMOVED: short.error_message = None # Clear previous error
     session.commit()
 
     logger.info(f"Queueing recreation for short {short_id}")
@@ -1458,11 +1543,13 @@ def get_shorts_for_video(video_id): # Renamed endpoint function
             'start_time': s.start_time,
             'end_time': s.end_time,
             'status': s.status,
+            # REMOVED: 'error_message': s.error_message, # Include error
             'short_url': url_for('serve_short', filename=s.short_filename, _external=True) if s.status == 'completed' and s.short_filename and os.path.exists(os.path.join(EDITED_SHORTS_DIR, s.short_filename)) else None
         } for s in shorts])
     except Exception as e:
         logger.error(f"Error fetching shorts for modal (video {video_id}): {e}", exc_info=True)
-        return jsonify({"error": "Failed to fetch shorts list"}), 500
+        # Provide a slightly more specific error if possible, but avoid leaking too much detail
+        return jsonify({"error": "Failed to process shorts list on server"}), 500
 
 # --- Socket and Run ---
 import socket

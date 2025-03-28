@@ -46,7 +46,7 @@ subtitle_fontsize = 60 # Slightly smaller maybe better with wrapping
 subtitle_color = "white"
 subtitle_stroke_width = 3 # Slightly smaller maybe better with wrapping
 subtitle_stroke_color = "black"
-zoom_factor = 2.0
+# zoom_factor = 2.0 # Default zoom factor removed, now passed as argument
 subtitle_vertical_offset = 550 # May need adjustment after wrapping
 words_per_line = 4 # Max words per subtitle line
 
@@ -262,19 +262,20 @@ def get_text_from_segments(segments):
 
 
 # --- Modified process_video ---
-def process_video(video_path, edited_filename, skip_editing=False, subtitle_file_path=None):
+def process_video(video_path, edited_filename, skip_editing=False, subtitle_file_path=None, zoom_factor=2.0):
     """
     Processes video: transcodes, optionally adds subtitles (generated or from file).
 
     Args:
         video_path (str): Path to the original video file.
         edited_filename (str): Desired filename for the output video.
-        skip_editing (bool): If True, only performs transcription (if no subtitle_file_path) or parsing.
+        skip_editing (bool): If True, only performs transcription/parsing, no video editing.
         subtitle_file_path (str, optional): Path to an SRT or VTT subtitle file to use instead of generating.
+        zoom_factor (float, optional): The factor by which to zoom into the video (e.g., 1.5, 2.0). Defaults to 2.0.
 
     Returns:
         tuple: (output_file_path, transcript_data, subtitle_groups_data)
-               output_file_path is the path to the edited video (or None if skip_editing).
+               output_file_path is the path to the edited video (even if skip_editing, it's the expected path).
                transcript_data is the list of Whisper segments (or None if using external subtitles or transcription failed).
                subtitle_groups_data is the list of parsed/grouped subtitles (from file or Whisper, or None on error).
     """
@@ -282,6 +283,14 @@ def process_video(video_path, edited_filename, skip_editing=False, subtitle_file
     transcript_data = None # Whisper segments list
     subtitle_groups = [] # Parsed/Grouped data for embedding or text extraction
     output_file = os.path.join(EDITED_VIDEOS_DIR, edited_filename) # Define potential output path early
+
+    # Validate zoom factor
+    try:
+        zoom_factor = float(zoom_factor)
+        if zoom_factor < 1.0: raise ValueError("Zoom factor must be >= 1.0")
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid zoom factor '{zoom_factor}'. Using default 2.0.")
+        zoom_factor = 2.0
 
     # 1. Determine Subtitle Source and Get Transcript/Subtitle Data
     processed_subtitle_file = False # Flag to track if we used an external file
@@ -342,7 +351,7 @@ def process_video(video_path, edited_filename, skip_editing=False, subtitle_file
         target_width, target_height = 1080, 1920 # 9:16 aspect ratio
 
         # Calculate scaling factor using MIN to fit, then zoom
-        scaling_factor = min(target_width / w, target_height / h) * zoom_factor # <-- USES MIN
+        scaling_factor = min(target_width / w, target_height / h) * zoom_factor # <-- USES zoom_factor variable
         # Use int casting as per the old code reference
         new_w, new_h = int(w * scaling_factor), int(h * scaling_factor)
 

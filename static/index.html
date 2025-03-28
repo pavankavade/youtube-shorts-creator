@@ -30,6 +30,10 @@
                      <label for="subtitle">2. Select Subtitle File (Optional .srt/.vtt):</label>
                      <input type="file" id="subtitle" name="subtitle" accept=".srt,.vtt">
                  </div>
+                 <div>
+                     <label for="zoomFactor">3. Zoom Factor (e.g., 1.5, 2.0):</label>
+                     <input type="number" id="zoomFactor" name="zoom_factor" step="0.1" min="1" value="2.0"> <!-- Added zoom factor input -->
+                 </div>
                  <button type="submit">Upload & Process</button>
              </form>
              <div id="uploadStatus" class="status"></div>
@@ -319,10 +323,10 @@
                             ? `<br><small>Using Generated Subs</small>`
                             : ''}
                          ${video.status === 'failed' && video.error_message
-                            ? `<br><small style="color: var(--danger-color);">Error: ${video.error_message}</small>` : ''}
+                            ? `<br><small style="color: var(--danger-color);" title="${video.error_message}">Error: ${video.error_message.substring(0, 50)}${video.error_message.length > 50 ? '...' : ''}</small>` : ''}
                     </td>
                     <td style="text-align: center;">
-                        <button onclick="playVideo('${video.edited_video_url}', 'Full Video: ${video.title || video.original_filename}')" ${!video.edited_video_url || isProcessing ? 'disabled' : ''} title="${video.edited_video_url && !isProcessing ? 'Play the full edited video' : (isProcessing ? 'Video processing' : 'Video not available')}">
+                        <button onclick="playVideo('${video.edited_video_url}', 'Full Video: ${(video.title || video.original_filename).replace(/'/g, "\\'")}')" ${!video.edited_video_url || isProcessing ? 'disabled' : ''} title="${video.edited_video_url && !isProcessing ? 'Play the full edited video' : (isProcessing ? 'Video processing' : 'Video not available')}">
                             Play Full
                         </button>
                     </td>
@@ -415,6 +419,7 @@
             const formData = new FormData();
             const videoFile = document.getElementById('video').files[0];
             const subtitleFile = document.getElementById('subtitle').files[0];
+            const zoomFactor = document.getElementById('zoomFactor').value; // Get zoom factor value
             const submitButton = e.target.querySelector('button[type="submit"]');
             const uploadStatusEl = document.getElementById('uploadStatus');
 
@@ -424,6 +429,13 @@
             }
 
             formData.append('video', videoFile);
+
+            // Validate and append zoom factor
+            const zoomValue = parseFloat(zoomFactor);
+            if (!isNaN(zoomValue) && zoomValue >= 1) {
+                formData.append('zoom_factor', zoomValue);
+            } // Backend will use default if not provided or invalid
+
             let statusMsg = 'Uploading video...';
 
             if (subtitleFile) {
@@ -776,7 +788,7 @@
                          <p>Status: <strong class="${getVideoStatusClass(short.status)}">${short.status}</strong></p>
                          ${shortIsFailed && short.error_message ? `<p><small style="color: var(--danger-color);">Error: ${short.error_message}</small></p>` : ''}
                      </div>
-                     <div class="short-time">
+                     <div class="short-time short-time-inputs">
                          <label for="start-${short.id}">Start:</label>
                          <input type="text" value="${short.start_time || ''}" id="start-${short.id}" pattern="\\d{1,3}:\\d{2}:\\d{2}(\\.\\d+)?" title="H:MM:SS or HH:MM:SS or H:MM:SS.ms" ${!canUpdateTimes ? 'disabled' : ''}>
                          <label for="end-${short.id}">End:</label>
@@ -790,7 +802,7 @@
                          <button onclick="recreateShort(${videoId}, ${short.id})" ${!canRecreate ? 'disabled' : ''} title="${canRecreate ? 'Re-generate this short video (overwrites existing)' : (shortIsProcessing ? 'Processing...' : 'Create first')}">
                              Recreate
                          </button>
-                         <button onclick="playVideo('${short.short_url}', 'Short: ${short.short_name || `Short ${short.id}`}')" ${!canPlay ? 'disabled' : ''} title="${canPlay ? 'Play the generated short' : (shortIsProcessing ? 'Processing...' : 'Short not ready or URL missing')}">
+                         <button onclick="playVideo('${short.short_url}', 'Short: ${(short.short_name || `Short ${short.id}`).replace(/'/g, "\\'")}')" ${!canPlay ? 'disabled' : ''} title="${canPlay ? 'Play the generated short' : (shortIsProcessing ? 'Processing...' : 'Short not ready or URL missing')}">
                              Play Short
                          </button>
                          <!-- <button class="danger" onclick="deleteShort(${videoId}, ${short.id})" title="Delete this short (Not Implemented)">Delete Short</button> -->
@@ -970,7 +982,9 @@
         // --- Video Player ---
         function playVideo(url, title = 'Video Player') {
             if (url && url !== 'null' && url !== 'undefined') {
-                document.getElementById('videoModalTitle').textContent = title;
+                // Escape HTML entities in the title before setting it as textContent
+                const escapedTitle = title.replace(/</g, "<").replace(/>/g, ">");
+                document.getElementById('videoModalTitle').textContent = escapedTitle;
                 const videoElement = document.getElementById('modalVideo');
                 // Add cache buster to video URL to ensure fresh playback
                 const separator = url.includes('?') ? '&' : '?';
