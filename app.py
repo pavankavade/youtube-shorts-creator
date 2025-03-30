@@ -18,8 +18,6 @@ import logging
 import re # Import re for time validation
 from flask_migrate import Migrate
 import time # Import time for delays
-# Removed sqlalchemy MetaData import as it's not needed without naming conventions for this specific change
-# from sqlalchemy import MetaData
 
 app = Flask(__name__, static_url_path='', static_folder='static')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///shorts.db'
@@ -27,7 +25,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Increase timeout for longer operations if needed
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_timeout': 30, 'pool_recycle': 280}
 
-# Removed metadata and naming convention section
 db = SQLAlchemy(app) # Use default SQLAlchemy initialization
 migrate = Migrate(app, db)
 
@@ -51,7 +48,6 @@ class Video(db.Model):
     video_title = db.Column(db.String(512))
     transcript = db.Column(db.Text) # Stores formatted Whisper transcript OR indicator like "Using uploaded..."
     uploaded_subtitle_filename = db.Column(db.String(512), nullable=True) # Existing field
-    # REMOVED: error_message = db.Column(db.Text, nullable=True)
 
 
 class ShortSegment(db.Model):
@@ -64,7 +60,6 @@ class ShortSegment(db.Model):
     end_time = db.Column(db.String(12), nullable=False) # Allow slightly longer format HHH:MM:SS
     short_filename = db.Column(db.String(512))
     status = db.Column(db.String(20), default='pending', index=True)
-    # REMOVED: error_message = db.Column(db.Text, nullable=True)
 
 
 with app.app_context():
@@ -191,7 +186,7 @@ def get_suggested_segments(subtitle_content_text):
             "Analyze the following video subtitle text and suggest 3-5 engaging segments suitable for YouTube Shorts (typically 50-60 seconds). "
             "Focus on segments with clear topics, questions, or strong statements.\n\n"
             "If a logical segment is significantly longer than 60 seconds, try to break it into meaningful parts (e.g., 'Topic X Part 1', 'Topic X Part 2'), ensuring each part is still engaging on its own.\n\n"
-            "if the duration of the whole video is more than 20 minutes, please suggest at least 15 segments.\n\n"
+            "if the duration of the whole video is more than 20 minutes, please suggest at least 20 segments.\n\n"
             f"{time_guidance}"
             "Return the result *ONLY* as a valid JSON array. Each object in the array must contain:\n"
             "- 'shortname': A concise, unique, descriptive name for the clip (under 50 characters).\n"
@@ -208,7 +203,7 @@ def get_suggested_segments(subtitle_content_text):
             generation_config=genai_types.GenerationConfig(
                 response_mime_type="application/json", # Request JSON output directly
                 # response_schema= # Consider defining schema for stricter validation if needed
-                max_output_tokens=4096, # Adjust token limit if needed
+                max_output_tokens=8042, # Adjust token limit if needed
                 temperature=0.3 # Slightly adjusted temperature for consistency
             ),
             # safety_settings= # Add safety settings if necessary
@@ -340,7 +335,6 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
     with app.app_context(): # Ensure DB access within thread
         video = None # Initialize
         session = db.session # Use scoped session
-        # REMOVED: processing_error_message = None # Store error message for DB
         try:
             video = session.get(Video, video_id) # Use session.get for primary key lookup
             if not video:
@@ -354,7 +348,6 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
                  return
 
             video.status = 'processing'
-            # REMOVED: video.error_message = None # Clear previous error
             session.commit()
             logger.info(f"Starting processing for video {video_id}. Force: {force_reprocess}, Use Subs Hint: {use_uploaded_subtitle}, Zoom: {zoom_factor}")
 
@@ -552,24 +545,17 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
 
         except FileNotFoundError as e:
              logger.error(f"File not found error processing video {video_id}: {e}", exc_info=True)
-             # REMOVED: processing_error_message = str(e)
              if video: video.status = 'failed'
         except (subprocess.CalledProcessError, ValueError, RuntimeError) as e: # Catch ffmpeg, value errors, etc.
              logger.error(f"Subprocess or Value error during processing video {video_id}: {e}", exc_info=True)
-             # REMOVED: processing_error_message = str(e)
              if video: video.status = 'failed'
         except Exception as e: # Catch all other exceptions
             logger.error(f"General error processing video {video_id}: {e}", exc_info=True)
-            # REMOVED: processing_error_message = str(e)
             if video: video.status = 'failed'
         finally:
             # Commit final status (completed or failed)
             if video and video.status in ['failed', 'completed']:
                  try:
-                     # REMOVED: Error message setting block
-                     # if video.status == 'failed' and processing_error_message:
-                         # Store truncated error message
-                         # video.error_message = processing_error_message[:1024] # Limit length
                      session.commit()
                  except Exception as db_err:
                      logger.error(f"Failed to commit final status '{video.status}' for video {video_id}: {db_err}")
@@ -612,9 +598,6 @@ def regenerate_suggestions(video_id):
                 logger.warning(f"Video {video_id} status is {current_status}. Cannot regenerate suggestions now.")
                 return
 
-            # --- Mark as Processing (optional, short duration task) ---
-            # video.status = 'processing' # Might be confusing, maybe skip status change for suggestions only?
-            # session.commit()
             logger.info(f"Regenerating short suggestions for video {video_id}.")
 
             # --- Get Text Content ---
@@ -622,9 +605,6 @@ def regenerate_suggestions(video_id):
 
             if not text_for_gemini:
                 logger.warning(f"No valid subtitle content found for video {video_id} to regenerate suggestions.")
-                # Should we mark the video as failed? Or just log? Let's just log.
-                # if video.status == 'processing': video.status = 'completed' # Revert status if changed
-                # session.commit()
                 return
 
             # --- Get New Segments ---
@@ -673,7 +653,6 @@ def regenerate_suggestions(video_id):
             # Ensure status is completed if it wasn't changed
             if video.status != 'completed':
                  video.status = 'completed'
-                 # REMOVED: video.error_message = None # Clear error if completing successfully now
                  session.commit()
             logger.info(f"Suggestion regeneration finished for video {video_id}. Added {added_count} new suggestions.")
 
@@ -698,7 +677,6 @@ def process_short(video_id, short_id):
     with app.app_context(): # Ensure DB access within thread
         short = None
         session = db.session # Use scoped session
-        # REMOVED: processing_error_message = None # Store error for DB
         try:
             short = session.get(ShortSegment, short_id)
             if not short:
@@ -706,7 +684,6 @@ def process_short(video_id, short_id):
                  return
             if short.video_id != video_id:
                  logger.error(f"Short {short_id} does not belong to video {video_id}.")
-                 # REMOVED: processing_error_message = "Mismatched video ID."
                  short.status = 'failed' # Mark as failed
                  session.commit()
                  return
@@ -721,7 +698,6 @@ def process_short(video_id, short_id):
                  return
 
             short.status = 'processing'
-            # REMOVED: short.error_message = None # Clear previous error
             session.commit()
             logger.info(f"Starting short creation for short {short_id} (Video {video_id}).")
 
@@ -768,7 +744,6 @@ def process_short(video_id, short_id):
                  "-i", edited_video_path,           # Input file
                  "-ss", str(start_seconds),       # Start time (Output Seeking - AFTER -i)
                  "-t", str(duration_seconds),     # Duration of the clip
-                 # Re-encode video and audio with reasonable settings
                  "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                  "-c:a", "aac", "-b:a", "128k",
                  "-avoid_negative_ts", "make_zero", # Handle potential timestamp issues
@@ -797,17 +772,14 @@ def process_short(video_id, short_id):
 
         except FileNotFoundError as e:
              logger.error(f"File not found error creating short {short_id}: {e}", exc_info=True)
-             # REMOVED: processing_error_message = str(e)
              if short: short.status = 'failed'
         except ValueError as e: # Catch invalid duration, status errors etc.
              logger.error(f"Value error creating short {short_id}: {e}", exc_info=True)
-             # REMOVED: processing_error_message = str(e)
              if short: short.status = 'failed'
         except (subprocess.CalledProcessError, RuntimeError) as e: # Catch ffmpeg errors or file creation errors
              # Log stderr from the exception if available
              stderr_output = e.stderr if hasattr(e, 'stderr') else 'N/A'
              logger.error(f"FFmpeg/Runtime error for short {short_id}. Error: {e}, FFmpeg stderr: {stderr_output}", exc_info=True)
-             # REMOVED: processing_error_message = f"FFmpeg Error: {e}. Stderr: {stderr_output}"
              if short:
                  short.status = 'failed'
                  short.short_filename = None # Clear filename on failure
@@ -820,7 +792,6 @@ def process_short(video_id, short_id):
                          logger.warning(f"Could not delete potentially corrupted short file: {short_path}")
         except Exception as e: # Catch-all for other unexpected errors
             logger.error(f"General error creating short {short_id}: {e}", exc_info=True)
-            # REMOVED: processing_error_message = str(e)
             if short:
                  short.status = 'failed'
                  short.short_filename = None # Ensure filename is cleared
@@ -828,9 +799,6 @@ def process_short(video_id, short_id):
             # Commit status change if an error occurred and short object exists
             if short and short.status == 'failed':
                 try:
-                    # REMOVED: Error message setting block
-                    # if processing_error_message:
-                    #      short.error_message = processing_error_message[:1024] # Truncate
                     session.commit()
                 except Exception as db_err:
                     logger.error(f"Failed to commit 'failed' status for short {short_id}: {db_err}")
@@ -933,8 +901,6 @@ def upload_video_endpoint(): # Renamed endpoint function
             video.status = 'pending'
             video.edited_filename = None
             video.transcript = None # Clear old transcript/indicator
-            # REMOVED: video.error_message = None # Clear error on new upload
-
             # Clean up associated files before potentially saving new ones
             if video.uploaded_subtitle_filename:
                 old_sub = os.path.join(SUBTITLES_DIR, video.uploaded_subtitle_filename)
@@ -1070,13 +1036,10 @@ def upload_subtitle(video_id):
         # --- Update Database ---
         video.uploaded_subtitle_filename = new_filename
         video.status = 'pending_reprocess' # Indicate it needs reprocessing with the new subs
-        # REMOVED: video.error_message = None # Clear any previous error
         # Clear existing transcript if switching to uploaded subs
         video.transcript = f"Processing with uploaded subtitle: {new_filename}"
         session.commit()
 
-        # Q: Should reprocessing use the original zoom factor or a new one?
-        # A: Using default (2.0) for simplicity for this trigger.
         reprocess_zoom_factor = 2.0
         # --- Start Reprocessing ---
         logger.info(f"Triggering reprocessing for video {video_id} with new subtitle (Zoom: {reprocess_zoom_factor}).")
@@ -1126,7 +1089,6 @@ def trigger_reprocess_endpoint(video_id):
     logger.info(f"Explicit trigger request for reprocessing video {video_id} *with* subtitles (Zoom: {reprocess_zoom_factor}).")
     # Update status to indicate reprocessing is needed
     video.status = 'pending_reprocess'
-    # REMOVED: video.error_message = None # Clear previous error
     session.commit()
 
     # Start the reprocessing task (forcing use of subs)
@@ -1161,7 +1123,6 @@ def reprocess_auto_detect_endpoint(video_id):
     logger.info(f"Request to reprocess video {video_id} (auto-detecting subtitle source, Zoom: {reprocess_zoom_factor}).")
     # Update status to indicate reprocessing is needed
     video.status = 'pending_reprocess'
-    # REMOVED: video.error_message = None # Clear previous error
     session.commit()
 
     # Start the full reprocessing task (auto-detecting subs)
@@ -1196,7 +1157,6 @@ def get_videos():
                     'start_time': s.start_time,
                     'end_time': s.end_time,
                     'status': s.status,
-                    # REMOVED: 'error_message': s.error_message, # Include short error message
                     # Generate URL only if file likely exists
                     'short_url': url_for('serve_short', filename=s.short_filename, _external=True) if s.status == 'completed' and s.short_filename and os.path.exists(os.path.join(EDITED_SHORTS_DIR, s.short_filename)) else None
                 } for s in shorts]
@@ -1212,7 +1172,6 @@ def get_videos():
                 'title': v.video_title or os.path.splitext(v.original_filename)[0].replace('_', ' ').title(), # Fallback title
                 'original_filename': v.original_filename,
                 'status': v.status,
-                # REMOVED: 'error_message': v.error_message, # Include video error message
                 'uploaded_subtitle_filename': v.uploaded_subtitle_filename,
                 # Provide URL only if file exists and status allows playback
                 'edited_video_url': url_for('serve_edited_video', filename=v.edited_filename, _external=True) if v.status == 'completed' and edited_video_exists else None,
@@ -1246,7 +1205,6 @@ def create_short_endpoint(video_id, short_id): # Renamed to avoid conflict
 
     # Update status to queued immediately
     short.status = 'queued'
-    # REMOVED: short.error_message = None # Clear previous error
     session.commit()
 
     # Start processing in background thread
@@ -1382,7 +1340,6 @@ def update_short(video_id, short_id):
         elif short.status == 'failed':
             logger.info(f"Times updated for failed short {short_id}. Resetting status to 'pending'.")
             short.status = 'pending'
-            # REMOVED: short.error_message = None # Clear error message
             status_reset_msg = ' Status reset to pending.'
 
         session.commit()
@@ -1394,7 +1351,6 @@ def update_short(video_id, short_id):
              'start_time': short.start_time,
              'end_time': short.end_time,
              'status': short.status,
-             # REMOVED: 'error_message': short.error_message, # Should be None if reset
              'short_url': url_for('serve_short', filename=short.short_filename, _external=True) if short.status == 'completed' and short.short_filename else None
         }
         message = f'Short updated successfully.{status_reset_msg}'
@@ -1489,7 +1445,6 @@ def recreate_short_endpoint(video_id, short_id): # Renamed endpoint function
 
     # --- Queue Task ---
     short.status = 'queued' # Use queued status
-    # REMOVED: short.error_message = None # Clear previous error
     session.commit()
 
     logger.info(f"Queueing recreation for short {short_id}")
@@ -1543,7 +1498,6 @@ def get_shorts_for_video(video_id): # Renamed endpoint function
             'start_time': s.start_time,
             'end_time': s.end_time,
             'status': s.status,
-            # REMOVED: 'error_message': s.error_message, # Include error
             'short_url': url_for('serve_short', filename=s.short_filename, _external=True) if s.status == 'completed' and s.short_filename and os.path.exists(os.path.join(EDITED_SHORTS_DIR, s.short_filename)) else None
         } for s in shorts])
     except Exception as e:

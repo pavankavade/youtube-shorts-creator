@@ -365,10 +365,6 @@ def process_video(video_path, edited_filename, skip_editing=False, subtitle_file
         # Create a black background clip with the target size
         background = ColorClip(size=(target_width, target_height), color=(0, 0, 0)).set_duration(video.duration) # <-- Creates background
 
-        # NO EXPLICIT CROPPING HERE
-
-        # video_resized = video_resized.set_duration(video.duration) # Duration is usually handled by background/composite
-
         # --- Subtitle Creation ---
         subtitle_clips = []
         if subtitle_groups:

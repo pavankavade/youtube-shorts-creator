@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Responsive viewport -->
     <title>Video Shorts Generator</title>
-    <!-- Consider linking a separate CSS file for better organization -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -39,10 +38,6 @@
              <div id="uploadStatus" class="status"></div>
          </div>
     </div>
-
-
-    <!-- Removed HR, using section spacing instead -->
-    <!-- <hr> -->
 
     <!-- Added container div for table section styling -->
     <div id="videosTableContainer">
@@ -90,7 +85,7 @@
         // Track modal state and refresh interval
         let currentModalVideoId = null;
         let refreshIntervalId = null; // Interval ID for clearing
-        const REFRESH_INTERVAL_MS = 7000; // Refresh every 7 seconds
+        const REFRESH_INTERVAL_MS = 30000; // Refresh every 7 seconds
         const toggleSwitch = document.getElementById('darkModeToggle');
         const currentTheme = localStorage.getItem('theme');
 
@@ -100,8 +95,6 @@
             if (toggleSwitch) {
                  toggleSwitch.checked = theme === 'dark';
             }
-             // Optional: Dispatch an event if other components need to react
-             // document.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: theme } }));
         }
 
         // Apply the saved theme or the preferred scheme on initial load
@@ -517,8 +510,6 @@
                  submitButton.disabled = false;
                  fileInput.disabled = false;
             }
-            // No finally block needed here as we want buttons enabled only on error or after refresh confirms state.
-            // Refresh triggered above will handle re-enabling based on actual video status.
         }
 
         // Trigger "Reprocess All (Force Use Subs)"
@@ -710,9 +701,9 @@
                             setStatus('shortsModalStatus', '');
                          }
                          // Optional: Could stop the interval if nothing is processing anymore
-                         // clearInterval(refreshIntervalId);
-                         // refreshIntervalId = null;
-                         // console.log("Interval: Stable state reached, stopping interval.");
+                         clearInterval(refreshIntervalId);
+                         refreshIntervalId = null;
+                         console.log("Interval: Stable state reached, stopping interval.");
                      }
 
                  }, REFRESH_INTERVAL_MS);
@@ -996,8 +987,6 @@
                 setStatus('listStatus', 'Video URL is not available for playback.', true, 5000);
             }
         }
-        // closeVideoModal is handled by closeModal('videoModal')
-
 
         // --- Delete Video ---
         async function deleteVideo(videoId) {
