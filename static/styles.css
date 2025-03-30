@@ -1,5 +1,6 @@
-
+/* --- Base Variables & Resets --- */
 :root {
+    /* Light Mode Colors */
     --primary-color: #007bff;
     --primary-hover: #0056b3;
     --danger-color: #dc3545;
@@ -13,459 +14,20 @@
     --pending-color: gray;
     --queued-color: var(--info-color);
     --pending-reprocess-color: purple;
+
+    --bg-color: #f0f2f5; /* Slightly off-white */
+    --section-bg: #ffffff;
     --text-color: #333;
-    --light-gray: #f8f9fa;
-    --medium-gray: #e9ecef;
-    --border-color: #dee2e6;
-    --border-radius: 5px; /* Slightly increased for softer look */
-    --box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    --box-shadow-light: 0 1px 3px rgba(0,0,0,0.08);
-}
-#shortsModalContent { /* Target the specific modal content */
-    /* Add these properties: */
-    display: flex;
-    flex-direction: column;
-    max-height: 85vh; /* Or adjust %/vh value as needed */
-
-    /* Ensure existing relevant styles remain */
-    background-color: #fff;
-    margin: 5% auto;
-    padding: 25px;
-    border: none;
-    width: 90%;
-    max-width: 800px;
-    position: relative; /* Keep this for the absolute close button */
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    animation: slideIn 0.3s;
-}
-
-/* Basic Reset & Box Sizing */
-*, *::before, *::after {
-    box-sizing: border-box;
-}
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    margin: 20px;
-    line-height: 1.6;
-    background-color: var(--light-gray);
-    color: var(--text-color);
-}
-
-/* Sections */
-#uploadSection, #videosTableContainer {
-     background-color: #fff;
-     padding: 20px;
-     margin-bottom: 25px;
-     border-radius: var(--border-radius);
-     box-shadow: var(--box-shadow);
-}
-
-h1, h2 {
-    color: var(--text-color);
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 10px;
-    margin-top: 0; /* Remove default top margin */
-    margin-bottom: 20px;
-}
-h1 { font-size: 1.8rem; }
-h2 { font-size: 1.5rem; }
-
-hr { border: 0; border-top: 1px solid var(--border-color); margin: 30px 0; }
-
-label {
-     margin-right: 10px;
-     font-weight: bold;
-     display: block; /* Default to block for stacking */
-     margin-bottom: 5px;
-}
-
-input[type="file"], input[type="text"], button {
-     padding: 10px 15px; /* Increased padding */
-     margin: 5px 0;
-     border-radius: var(--border-radius);
-     border: 1px solid var(--border-color);
-     font-size: 1rem;
-     vertical-align: middle; /* Align better with text/other elements */
-}
- input[type="text"] {
-     width: 100%; /* Default to full width, containers will manage */
- }
- input[type="file"] {
-      width: 100%;
-      border: 1px dashed var(--border-color); /* Style file input */
-      background-color: var(--light-gray);
-      cursor: pointer;
- }
- input[type="file"]:hover {
-     border-color: var(--primary-color);
- }
-
-button {
-     cursor: pointer;
-     background-color: var(--primary-color);
-     color: white;
-     border: none;
-     transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
-}
-button:hover:not(:disabled) { background-color: var(--primary-hover); }
-button:disabled { background-color: #cccccc; cursor: not-allowed; opacity: 0.7; }
-button.danger { background-color: var(--danger-color); }
-button.danger:hover:not(:disabled) { background-color: var(--danger-hover); }
-
-.status {
-     margin-top: 15px;
-     font-style: italic;
-     color: #555;
-     min-height: 1.2em;
-     padding: 10px;
-     border-radius: var(--border-radius);
-     border: 1px solid transparent; /* Reserve space for border */
-}
-.status-processing { color: var(--processing-color); font-weight: bold; background-color: #fff8e1; border-color: var(--processing-color);}
-.status-completed { color: var(--completed-color); font-weight: bold; background-color: #e9f7ef; border-color: var(--completed-color);}
-.status-failed { color: var(--failed-color); font-weight: bold; background-color: #fdeded; border-color: var(--failed-color);}
-.status-pending { color: var(--pending-color); background-color: #f8f9fa; border-color: var(--pending-color);}
-.status-queued { color: var(--queued-color); font-weight: bold; background-color: #e3f2fd; border-color: var(--info-color);}
-.status-pending_reprocess { color: var(--pending-reprocess-color); font-weight: bold; background-color: #f3e5f5; border-color: var(--pending-reprocess-color);}
-.status-info { color: var(--info-color); background-color: #e3f2fd; border-color: var(--info-color);} /* Added for general info */
-
-small { font-size: 0.85em; color: #555; display: block; margin-top: 2px; word-break: break-all; }
-
-/* Upload Form Specifics */
- #uploadForm {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
- }
- #uploadForm label {
-      margin-bottom: 0; /* Remove bottom margin as gap handles it */
- }
- #uploadForm button {
-      margin-top: 10px;
-      align-self: flex-start; /* Prevent button stretching full width */
- }
-
-/* Table styling */
-#videosTableContainer {
-     overflow-x: auto; /* Add horizontal scroll for small screens */
-     padding: 0; /* Remove container padding, table handles it */
-}
-#videosTable {
-     width: 100%;
-     border-collapse: collapse;
-     /* Removed margin-top as container handles spacing */
-     background-color: #fff;
-     /* Removed shadow/radius from table, container has it */
-     /* overflow: hidden; /* Can cause issues with shadows on scrolled content */
-}
-#videosTable th, #videosTable td {
-     border: 1px solid var(--border-color);
-     padding: 12px 15px;
-     text-align: left;
-     vertical-align: middle; /* Align content vertically */
-     word-break: break-word; /* Allow long words to break */
-}
-#videosTable th {
-     background-color: var(--medium-gray);
-     font-weight: bold;
-     white-space: nowrap; /* Prevent headers from wrapping */
-}
-/* Column widths - Adjust as needed */
-#videosTable th:nth-child(1), #videosTable td:nth-child(1) { width: 5%; text-align: center; } /* ID */
-#videosTable th:nth-child(2), #videosTable td:nth-child(2) { width: 30%; } /* Details */
-#videosTable th:nth-child(3), #videosTable td:nth-child(3) { width: 10%; text-align: center; } /* Full Video */
-#videosTable th:nth-child(4), #videosTable td:nth-child(4) { width: 15%; text-align: center; } /* Shorts Button */
-#videosTable th:nth-child(5), #videosTable td:nth-child(5) { width: 40%; } /* Actions & Subtitles */
-
-#videosTable td .button-group {
-     display: flex;
-     flex-wrap: wrap;
-     gap: 8px; /* Increased gap */
-     align-items: center;
-}
-#videosTable td .button-group button {
-     margin: 0; /* Remove default margin */
-     padding: 6px 10px; /* Slightly smaller buttons in table */
-     font-size: 0.9em;
-}
-
-/* Subtitle Upload Form Styling (within table) */
-.subtitle-upload-form {
-    margin-top: 10px; /* Space above this form */
-    display: flex;
-    flex-wrap: wrap; /* Allow wrapping */
-    align-items: center;
-    gap: 8px;
-    border-top: 1px solid var(--medium-gray);
-    padding-top: 10px;
-}
-.subtitle-upload-form label {
-     font-weight: normal;
-     font-size: 0.9em;
-     margin: 0; /* Remove default label margins */
-     flex-shrink: 0; /* Prevent label from shrinking */
-     display: inline-block; /* Allow inline display */
-     width: auto; /* Override block display */
-}
-.subtitle-upload-form input[type="file"] {
-     margin: 0;
-     padding: 6px;
-     flex-grow: 1; /* Allow file input to take available space */
-     font-size: 0.9em;
-     width: auto; /* Override 100% width */
-     min-width: 150px; /* Ensure usability */
-     border-style: solid; /* Override dashed */
-     background-color: white;
-}
- .subtitle-upload-form button {
-     margin: 0;
-     padding: 6px 10px;
-     font-size: 0.9em;
-     flex-shrink: 0; /* Prevent button from shrinking */
- }
-
- /* Modal Styles */
- .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); /* Darker overlay */ animation: fadeIn 0.3s; }
- .modal-content { background-color: #fff; margin: 5% auto; padding: 25px; border: none; width: 90%; max-width: 800px; position: relative; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s; }
- .close-button {  z-index: 10; position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; line-height: 1; background: none; border: none; padding: 0; }
- .close-button:hover { color: var(--text-color); }
- #modalVideo { width: 100%; max-height: 70vh; height: auto; background-color: #000; border-radius: var(--border-radius); display: block; } /* Added display block */
-
- /* Shorts List Styling (Inside Modal) */
- #shortsList { 
-    margin-top: 20px; 
-    flex-grow: 1; /* Allows the list to take available vertical space */
-    overflow-y: auto; /* Enables vertical scrolling ONLY for the list */
-    padding-right: 10px; /* Add slight padding so scrollbar doesn't overlap content *}
- #shortsList .short-item {
-     border: 1px solid var(--medium-gray); /* Use border instead of just bottom */
-     background-color: var(--light-gray);
-     padding: 15px;
-     margin-bottom: 15px; /* Space between items */
-     border-radius: var(--border-radius);
-     box-shadow: var(--box-shadow-light);
-}
- /* #shortsList .short-item:last-child { border-bottom: 1px solid var(--medium-gray); } */ /* Remove last-child rule */
- #shortsList p { margin: 5px 0 10px 0; }
- #shortsList .short-info strong { font-size: 1.1em;}
- #shortsList .short-time {
-      display: flex;
-      flex-wrap: wrap; /* Allow wrapping on small screens */
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-      border-top: 1px dashed var(--border-color);
-      padding-top: 10px;
-      margin-top: 10px;
- }
- #shortsList .short-time label {
-     font-weight: normal;
-     margin: 0;
-     font-size: 0.9em;
-     display: inline-block; /* Override block */
-     width: auto; /* Override block */
- }
- #shortsList .short-time input[type="text"] {
-     padding: 6px 8px;
-     font-size: 0.9em;
-     margin: 0;
-     border: 1px solid var(--medium-gray);
-     /* Flexible width: takes available space, min/max limits */
-     flex: 1 1 auto;
-     min-width: 75px; /* Ensure usable width */
-     max-width: 100px; /* Prevent growing too large */
-     width: auto; /* Override 100% default */
- }
- #shortsList .short-time button {
-     padding: 6px 10px;
-     font-size: 0.9em;
-     margin: 0;
-     flex-shrink: 0; /* Prevent shrinking */
- }
- #shortsList .short-actions {
-     margin-top: 10px;
-     display: flex;
-     flex-wrap: wrap;
-     gap: 8px;
-     padding-top: 10px;
-     border-top: 1px dashed var(--border-color);
- }
- #shortsList .short-actions button {
-     margin: 0;
-     padding: 6px 10px;
-     font-size: 0.9em;
- }
- /* Button added dynamically for suggesting more */
- #shortsList > button {
-     margin-top: 15px;
- }
-
-
- /* Animations */
- @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
- @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-/* --- Responsive Adjustments --- */
-@media (max-width: 768px) {
-    body {
-        margin: 10px; /* Reduced margin */
-        font-size: 0.95rem; /* Slightly smaller base font */
-    }
-
-    h1 { font-size: 1.6rem; }
-    h2 { font-size: 1.3rem; }
-
-    #uploadSection, #videosTableContainer {
-         padding: 15px; /* Reduced padding */
-         margin-bottom: 20px;
-    }
-
-    input[type="file"], input[type="text"], button {
-         padding: 8px 12px; /* Slightly reduce padding */
-         font-size: 0.95rem;
-    }
-
-    /* Table adjustments */
-    #videosTable th, #videosTable td {
-         padding: 8px; /* Reduced cell padding */
-    }
-     /* Example: Adjust specific columns if needed, e.g., make ID column smaller */
-     #videosTable th:nth-child(1), #videosTable td:nth-child(1) { width: auto; font-size: 0.85em; } /* Let ID shrink */
-     #videosTable th:nth-child(3), #videosTable td:nth-child(3), /* Play */
-     #videosTable th:nth-child(4), #videosTable td:nth-child(4) { width: auto; } /* Shorts */
-     /* Give more space to Details and Actions */
-     #videosTable th:nth-child(2), #videosTable td:nth-child(2) { min-width: 120px; } /* Details */
-     #videosTable th:nth-child(5), #videosTable td:nth-child(5) { min-width: 200px; } /* Actions */
-
-
-    #videosTable td .button-group {
-         gap: 5px; /* Slightly reduce gap */
-    }
-    #videosTable td .button-group button {
-         padding: 5px 8px;
-         font-size: 0.85em;
-    }
-     .subtitle-upload-form {
-          gap: 5px;
-     }
-     .subtitle-upload-form input[type="file"] {
-          min-width: 120px; /* Adjust min-width if needed */
-     }
-     .subtitle-upload-form button {
-         padding: 5px 8px;
-         font-size: 0.85em;
-     }
-
-
-    /* Modal adjustments */
-    .modal-content {
-        padding: 20px; /* Reduce modal padding */
-        margin: 10% auto; /* Adjust vertical margin */
-    }
-
-    /* Shorts List inside modal */
-    #shortsList .short-item {
-        padding: 10px;
-    }
-    #shortsList .short-time { gap: 5px; }
-    #shortsList .short-time input[type="text"] {
-         min-width: 65px; /* Further reduce min width */
-         max-width: 90px;
-    }
-    #shortsList .short-actions { gap: 5px; }
-    #shortsList .short-actions button,
-    #shortsList .short-time button {
-        padding: 5px 8px;
-        font-size: 0.85em;
-    }
-
-} /* End of media query */
-/* --- Dark Mode Toggle Switch --- */
-.theme-switch-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 10px; /* Space between switch and text */
-    position: absolute; /* Position relative to the nearest positioned ancestor or initial containing block */
-    top: 20px; /* Adjust as needed */
-    right: 20px; /* Adjust as needed */
-}
-.theme-switch-wrapper em {
-    font-size: 0.9rem;
-    color: var(--text-color); /* Use variable */
-}
-
-.theme-switch {
-    position: relative;
-    display: inline-block;
-    width: 50px; /* Width of the switch */
-    height: 24px; /* Height of the switch */
-}
-
-.theme-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #ccc;
-    transition: .4s;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 18px; /* Size of the handle */
-    width: 18px;  /* Size of the handle */
-    left: 3px;    /* Position from left */
-    bottom: 3px;  /* Position from bottom */
-    background-color: white;
-    transition: .4s;
-}
-
-input:checked + .slider {
-    background-color: var(--primary-color); /* Use theme color when active */
-}
-
-input:focus + .slider {
-    box-shadow: 0 0 1px var(--primary-color);
-}
-
-input:checked + .slider:before {
-    transform: translateX(26px); /* Move handle to the right */
-}
-
-/* Rounded sliders */
-.slider.round {
-    border-radius: 24px;
-}
-
-.slider.round:before {
-    border-radius: 50%;
-}
-
-/* --- Dark Mode Theme Variables & Overrides --- */
-/* Define light mode variables in :root (already done) */
-:root {
-    /* ... keep existing light mode variables ... */
-    --bg-color: var(--light-gray);
-    --section-bg: #fff;
-    --text-color-strong: #000; /* For stronger text like headers */
+    --text-color-strong: #000;
+    --text-muted: #6c757d;
     --input-bg: #fff;
-    --input-border: var(--border-color);
+    --input-border: #ced4da;
     --modal-bg: #fff;
-    --table-header-bg: var(--medium-gray);
-    --shadow-color: rgba(0,0,0,0.1);
-    --shadow-color-light: rgba(0,0,0,0.08);
-    --shadow-color-modal: rgba(0,0,0,0.3);
+    --table-header-bg: #e9ecef; /* Lighter gray */
+    --border-color: #dee2e6;
+    --shadow-color: rgba(0,0,0,0.08);
+    --shadow-color-light: rgba(0,0,0,0.05);
+    --shadow-color-modal: rgba(0,0,0,0.5); /* Standard overlay */
     --close-button-color: #aaa;
     --close-button-hover: var(--text-color);
     --status-processing-bg: #fff8e1;
@@ -475,45 +37,48 @@ input:checked + .slider:before {
     --status-queued-bg: #e3f2fd;
     --status-pending_reprocess-bg: #f3e5f5;
     --status-info-bg: #e3f2fd;
+
+    /* Sizing & Layout */
+    --base-font-size: 16px;
+    --border-radius: 6px; /* Slightly more rounded */
+    --spacing-unit: 1rem; /* 16px */
+    --container-padding: calc(var(--spacing-unit) * 1.5); /* 24px */
+    --element-padding-y: calc(var(--spacing-unit) * 0.5);  /* 8px */
+    --element-padding-x: calc(var(--spacing-unit) * 0.75); /* 12px */
+    --gap: var(--spacing-unit);
 }
 
-/* Define dark mode variables when html has data-theme="dark" */
+/* Dark Mode Variables */
 html[data-theme="dark"] {
-    --primary-color: #409eff; /* Slightly brighter blue */
+    --primary-color: #409eff;
     --primary-hover: #66b1ff;
     --danger-color: #f56c6c;
     --danger-hover: #f78989;
     --success-color: #67c23a;
     --warning-color: #e6a23c;
     --info-color: #909399;
-    --processing-color: #e6a23c; /* Same as warning */
+    --processing-color: #e6a23c;
     --failed-color: var(--danger-color);
     --completed-color: var(--success-color);
     --pending-color: #a8abb2;
     --queued-color: var(--info-color);
-    --pending-reprocess-color: #b39ddb; /* Lighter purple */
+    --pending-reprocess-color: #b39ddb;
 
-    --text-color: #e0e0e0; /* Light gray text */
-    --text-color-strong: #ffffff; /* White for strong text */
-    --light-gray: #2c2c2c; /* Darker gray */
-    --medium-gray: #3a3a3a; /* Medium dark gray */
-    --border-color: #444444; /* Lighter border for contrast */
-    --border-radius: 5px;
-    --shadow-color: rgba(255,255,255,0.05); /* Very subtle light shadow */
-    --shadow-color-light: rgba(255,255,255,0.03);
-    --shadow-color-modal: rgba(0,0,0,0.7); /* Darker modal overlay */
-
-    --bg-color: #121212; /* Very dark background */
-    --section-bg: #1e1e1e; /* Slightly lighter section background */
+    --bg-color: #121212;
+    --section-bg: #1e1e1e;
+    --text-color: #e0e0e0;
+    --text-color-strong: #ffffff;
+    --text-muted: #a8abb2;
     --input-bg: #2c2c2c;
     --input-border: #555555;
-    --modal-bg: #282828; /* Dark modal background */
-    --table-header-bg: #333333; /* Dark table header */
-
+    --modal-bg: #282828;
+    --table-header-bg: #333333;
+    --border-color: #444444;
+    --shadow-color: rgba(255,255,255,0.05);
+    --shadow-color-light: rgba(255,255,255,0.03);
+    --shadow-color-modal: rgba(0,0,0,0.7); /* Darker overlay */
     --close-button-color: #888;
     --close-button-hover: #ccc;
-
-     /* Darker, less saturated status backgrounds */
     --status-processing-bg: #3a3a2a;
     --status-completed-bg: #2a3a2a;
     --status-failed-bg: #3a2a2a;
@@ -523,204 +88,522 @@ html[data-theme="dark"] {
     --status-info-bg: #2a3a3a;
 }
 
-/* --- Apply Variables to Elements --- */
-/* Update existing rules to use the new variables */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: var(--base-font-size);
+}
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    margin: 20px;
     line-height: 1.6;
-    background-color: var(--bg-color); /* USE VAR */
-    color: var(--text-color);         /* USE VAR */
-    transition: background-color 0.3s, color 0.3s; /* Smooth transition */
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s, color 0.3s;
+    padding: var(--spacing-unit); /* Padding around the whole page */
 }
 
-#uploadSection, #videosTableContainer {
-     background-color: var(--section-bg); /* USE VAR */
-     padding: 20px;
-     margin-bottom: 25px;
+body.modal-open {
+    overflow: hidden; /* Prevent background scroll when modal is open */
+}
+
+/* --- Typography & Common Elements --- */
+h1, h2, h3, h4 {
+    color: var(--text-color-strong);
+    margin-bottom: var(--spacing-unit);
+    line-height: 1.3;
+}
+h1 { font-size: 1.8rem; }
+h2 { font-size: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: calc(var(--spacing-unit) / 2); }
+h3 { font-size: 1.25rem; }
+h4 { font-size: 1.1rem; }
+
+label {
+    display: block; /* Stack labels above inputs */
+    font-weight: 600; /* Slightly bolder */
+    margin-bottom: calc(var(--spacing-unit) / 3); /* Smaller margin */
+    color: var(--text-color);
+    font-size: 0.95rem;
+}
+
+input[type="file"],
+input[type="text"],
+input[type="number"],
+button {
+    padding: var(--element-padding-y) var(--element-padding-x);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--input-border);
+    font-size: 1rem;
+    vertical-align: middle;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    transition: background-color 0.3s, border-color 0.3s, color 0.3s, box-shadow 0.2s;
+    width: 100%; /* Default to full width */
+    margin-bottom: calc(var(--spacing-unit) / 2); /* Space below inputs */
+}
+input:focus, button:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(var(--primary-color), 0.2);
+}
+input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+input[type="file"] {
+    border-style: dashed;
+    background-color: var(--bg-color); /* Use main bg for file input */
+    cursor: pointer;
+    padding: calc(var(--element-padding-y) * 1.5) var(--element-padding-x); /* More vertical padding */
+}
+input[type="file"]:hover {
+    border-color: var(--primary-color);
+}
+/* Webkit specific styling for file input button */
+input[type="file"]::file-selector-button {
+    padding: var(--element-padding-y) var(--element-padding-x);
+    border-radius: calc(var(--border-radius) / 2);
+    border: 1px solid var(--primary-color);
+    background-color: var(--primary-color);
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-right: var(--spacing-unit);
+}
+input[type="file"]::file-selector-button:hover {
+    background-color: var(--primary-hover);
+}
+html[data-theme="dark"] input[type="file"] {
+     background-color: var(--medium-gray);
+}
+
+button {
+    cursor: pointer;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    font-weight: 500;
+    width: auto; /* Override 100% width for buttons */
+    display: inline-block; /* Allow buttons side-by-side */
+}
+button:hover:not(:disabled) { background-color: var(--primary-hover); }
+button:disabled { background-color: #cccccc; color: #666; cursor: not-allowed; opacity: 0.7; }
+button.danger { background-color: var(--danger-color); }
+button.danger:hover:not(:disabled) { background-color: var(--danger-hover); }
+html[data-theme="dark"] button:disabled {
+    background-color: #555;
+    color: #999;
+    opacity: 0.6;
+}
+
+small {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 2px;
+    line-height: 1.4;
+}
+small.filename, small.subtitle-info {
+    word-break: break-all; /* Allow long names to break */
+}
+small.error-message {
+    color: var(--danger-color);
+    word-break: break-word;
+}
+
+.status {
+    margin-top: var(--spacing-unit);
+    font-style: italic;
+    color: var(--text-muted);
+    min-height: 1.2em;
+    padding: var(--element-padding-y) var(--element-padding-x);
+    border-radius: var(--border-radius);
+    border: 1px solid transparent;
+    transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+    font-size: 0.9rem;
+}
+/* Status Backgrounds & Colors */
+.status-processing { color: var(--processing-color); background-color: var(--status-processing-bg); border-color: var(--processing-color); font-weight: bold; font-style: normal;}
+.status-completed { color: var(--completed-color); background-color: var(--status-completed-bg); border-color: var(--completed-color); font-weight: bold; font-style: normal;}
+.status-failed { color: var(--failed-color); background-color: var(--status-failed-bg); border-color: var(--failed-color); font-weight: bold; font-style: normal;}
+.status-pending { color: var(--pending-color); background-color: var(--status-pending-bg); border-color: var(--pending-color); font-style: normal;}
+.status-queued { color: var(--queued-color); background-color: var(--status-queued-bg); border-color: var(--info-color); font-weight: bold; font-style: normal;}
+.status-pending_reprocess { color: var(--pending-reprocess-color); background-color: var(--status-pending_reprocess-bg); border-color: var(--pending-reprocess-color); font-weight: bold; font-style: normal;}
+.status-info { color: var(--info-color); background-color: var(--status-info-bg); border-color: var(--info-color); font-style: normal;}
+
+/* Inline status (e.g., in table) - no background/border */
+.status-inline {
+    background-color: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: inline !important;
+    font-style: normal;
+    font-weight: bold; /* Keep bold */
+}
+.status-inline.status-pending { font-weight: normal; } /* Pending not usually bold */
+.status-inline.status-processing { color: var(--processing-color); }
+.status-inline.status-completed { color: var(--completed-color); }
+.status-inline.status-failed { color: var(--danger-color); }
+.status-inline.status-pending { color: var(--pending-color); }
+.status-inline.status-queued { color: var(--queued-color); }
+.status-inline.status-pending_reprocess { color: var(--pending-reprocess-color); }
+
+
+/* --- Header --- */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; /* Allow wrapping on very small screens */
+    gap: var(--gap);
+    margin-bottom: calc(var(--spacing-unit) * 1.5);
+    padding-bottom: var(--spacing-unit);
+    border-bottom: 1px solid var(--border-color);
+}
+.app-header h1 {
+    margin-bottom: 0; /* Remove margin from h1 in header */
+    border-bottom: none;
+    padding-bottom: 0;
+    flex-grow: 1; /* Allow title to take space */
+}
+
+/* --- Dark Mode Toggle Switch --- */
+.theme-switch-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    /* Removed absolute positioning, flows naturally in header */
+}
+.theme-switch-wrapper .toggle-label { /* Renamed from 'em' for clarity */
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.theme-switch { position: relative; display: inline-block; width: 50px; height: 24px; flex-shrink: 0; }
+.theme-switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; }
+.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; }
+input:checked + .slider { background-color: var(--primary-color); }
+input:focus + .slider { box-shadow: 0 0 1px var(--primary-color); }
+input:checked + .slider:before { transform: translateX(26px); }
+.slider.round { border-radius: 24px; }
+.slider.round:before { border-radius: 50%; }
+html[data-theme="dark"] .theme-switch-wrapper .toggle-label {
+    color: var(--text-muted);
+}
+
+/* --- Main Layout & Sections --- */
+.main-container {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--gap) * 1.5); /* Space between sections */
+}
+
+.content-section {
+     background-color: var(--section-bg);
+     padding: var(--container-padding);
      border-radius: var(--border-radius);
-     box-shadow: 0 2px 5px var(--shadow-color); /* USE VAR */
-     border: 1px solid var(--border-color); /* Add subtle border for dark mode */
+     box-shadow: 0 2px 5px var(--shadow-color);
+     border: 1px solid var(--border-color);
      transition: background-color 0.3s, border-color 0.3s;
 }
 
-h1, h2 {
-    color: var(--text-color-strong); /* USE VAR */
-    border-bottom: 1px solid var(--border-color); /* USE VAR */
-    padding-bottom: 10px;
-    margin-top: 0;
-    margin-bottom: 20px;
-    transition: color 0.3s, border-color 0.3s;
-}
-
-hr { border-top: 1px solid var(--border-color); /* USE VAR */ }
-
-label {
-     /* ... existing styles ... */
-     color: var(--text-color); /* Ensure label color uses variable */
-}
-
-input[type="file"], input[type="text"], button {
-     /* ... existing styles ... */
-     border: 1px solid var(--input-border); /* USE VAR */
-     background-color: var(--input-bg); /* USE VAR */
-     color: var(--text-color); /* Ensure input text is readable */
-     transition: background-color 0.3s, border-color 0.3s, color 0.3s;
-}
- input[type="file"] {
-      border: 1px dashed var(--input-border); /* USE VAR */
-      background-color: var(--medium-gray); /* Darker background for file input */
+/* --- Upload Form Specifics --- */
+ #uploadForm {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap); /* Consistent gap */
  }
- input[type="file"]:hover {
-     border-color: var(--primary-color); /* USE VAR */
+ #uploadForm > div {
+     margin-bottom: 0; /* Remove default margin if any */
  }
- input::placeholder { /* Style placeholder text */
-    color: var(--pending-color);
-    opacity: 0.7;
+ #uploadForm label {
+      margin-bottom: 5px; /* Space between label and input */
+ }
+ #uploadForm input {
+     margin-bottom: 0; /* Handled by form gap */
+ }
+ #uploadForm button[type="submit"] {
+      margin-top: calc(var(--spacing-unit) / 2);
+      align-self: flex-start; /* Prevent button stretching full width */
  }
 
-/* Style buttons specifically for dark mode contrast if needed */
-html[data-theme="dark"] button {
-     color: #fff; /* Ensure text is white on primary/danger buttons */
+/* --- Table Styling --- */
+/* Wrapper for horizontal scrolling */
+#videosTableContainer {
+     overflow-x: auto;
+     width: 100%; /* Ensure it takes full width */
+     -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
- html[data-theme="dark"] button:disabled {
-      background-color: #555;
-      color: #999;
-      opacity: 0.6;
- }
-
-.status {
-     /* ... existing styles ... */
-     color: #ccc; /* Default status text color in dark mode */
-     border: 1px solid transparent; /* Keep border */
-     background-color: transparent; /* Remove default light background */
-     transition: background-color 0.3s, border-color 0.3s, color 0.3s;
-}
-/* Update status background/text/border colors using variables */
-.status-processing { color: var(--processing-color); background-color: var(--status-processing-bg); border-color: var(--processing-color);}
-.status-completed { color: var(--completed-color); background-color: var(--status-completed-bg); border-color: var(--completed-color);}
-.status-failed { color: var(--failed-color); background-color: var(--status-failed-bg); border-color: var(--failed-color);}
-.status-pending { color: var(--pending-color); background-color: var(--status-pending-bg); border-color: var(--pending-color);}
-.status-queued { color: var(--queued-color); background-color: var(--status-queued-bg); border-color: var(--info-color);} /* Use info color for border */
-.status-pending_reprocess { color: var(--pending-reprocess-color); background-color: var(--status-pending_reprocess-bg); border-color: var(--pending-reprocess-color);}
-.status-info { color: var(--info-color); background-color: var(--status-info-bg); border-color: var(--info-color);}
-
-small { color: var(--pending-color); /* Lighter gray for small text */ }
-
-/* Table styling */
 #videosTable {
-     /* ... existing styles ... */
-     background-color: var(--section-bg); /* USE VAR */
+     width: 100%;
+     min-width: 800px; /* Force horizontal scroll on smaller screens, adjust as needed */
+     border-collapse: collapse;
+     background-color: var(--section-bg);
      transition: background-color 0.3s;
+     margin-top: var(--spacing-unit); /* Space above table */
 }
 #videosTable th, #videosTable td {
-     border: 1px solid var(--border-color); /* USE VAR */
-     /* ... existing styles ... */
+     border: 1px solid var(--border-color);
+     padding: var(--element-padding-y) var(--element-padding-x);
+     text-align: left;
+     vertical-align: middle;
+     word-break: break-word;
      transition: border-color 0.3s;
+     font-size: 0.95rem; /* Slightly smaller table text */
 }
 #videosTable th {
-     background-color: var(--table-header-bg); /* USE VAR */
-     color: var(--text-color-strong); /* USE VAR */
-     /* ... existing styles ... */
+     background-color: var(--table-header-bg);
+     color: var(--text-color-strong);
+     font-weight: 600;
+     white-space: nowrap;
      transition: background-color 0.3s, color 0.3s;
+     position: sticky; /* Make header sticky within scroll container if needed */
+     top: 0; /* Required for sticky */
+     z-index: 1; /* Ensure header is above scrolling content */
 }
+/* Column widths - Use percentages/auto for flexibility */
+#videosTable th:nth-child(1), #videosTable td:nth-child(1) { width: 5%; text-align: center; min-width: 40px;} /* ID */
+#videosTable th:nth-child(2), #videosTable td:nth-child(2) { width: 30%; min-width: 200px; } /* Details */
+#videosTable th:nth-child(3), #videosTable td:nth-child(3) { width: 10%; text-align: center; min-width: 90px; } /* Full Video */
+#videosTable th:nth-child(4), #videosTable td:nth-child(4) { width: 15%; text-align: center; min-width: 120px; } /* Shorts Button */
+#videosTable th:nth-child(5), #videosTable td:nth-child(5) { width: 40%; min-width: 300px; } /* Actions & Subtitles */
 
-/* Ensure table status text uses correct variable */
-#videosTable td .status-processing,
-#videosTable td .status-completed,
-#videosTable td .status-failed,
-#videosTable td .status-pending,
-#videosTable td .status-queued,
-#videosTable td .status-pending_reprocess {
-    background-color: transparent !important; /* Remove background inside table cell */
-    border: none !important; /* Remove border inside table cell */
-    padding: 0 !important; /* Remove padding inside table cell */
-    margin: 0 !important; /* Remove margin inside table cell */
-    font-weight: bold; /* Keep bold */
+/* Button group within table cells */
+.button-group {
+     display: flex;
+     flex-wrap: wrap;
+     gap: calc(var(--gap) / 2); /* Smaller gap for table buttons */
+     align-items: center;
 }
-#videosTable td .status-processing { color: var(--processing-color); }
-#videosTable td .status-completed { color: var(--completed-color); }
-#videosTable td .status-failed { color: var(--failed-color); }
-#videosTable td .status-pending { color: var(--pending-color); font-weight: normal;} /* Pending not usually bold */
-#videosTable td .status-queued { color: var(--queued-color); }
-#videosTable td .status-pending_reprocess { color: var(--pending-reprocess-color); }
-
+#videosTable td .button-group button {
+     margin: 0;
+     padding: calc(var(--element-padding-y) * 0.75) calc(var(--element-padding-x) * 0.75); /* Smaller buttons */
+     font-size: 0.85em;
+     flex-grow: 0; /* Don't grow */
+     flex-shrink: 0; /* Don't shrink */
+}
 
 /* Subtitle Upload Form Styling (within table) */
 .subtitle-upload-form {
-    /* ... existing styles ... */
-    border-top: 1px solid var(--medium-gray); /* USE VAR */
+    margin-top: var(--spacing-unit);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--gap) / 2);
+    border-top: 1px solid var(--border-color);
+    padding-top: var(--spacing-unit);
+}
+.subtitle-upload-form label {
+     font-weight: normal;
+     font-size: 0.9em;
+     margin: 0;
+     flex-shrink: 0;
+     display: inline-block;
+     width: auto;
+     margin-bottom: 0; /* Override general label margin */
+}
+.subtitle-upload-form input[type="file"] {
+     margin: 0;
+     padding: calc(var(--element-padding-y) * 0.75);
+     flex-grow: 1; /* Allow file input to take available space */
+     font-size: 0.9em;
+     width: auto; /* Override 100% width */
+     min-width: 150px;
+     border-style: solid;
+     background-color: var(--input-bg); /* Use input bg */
+     margin-bottom: 0; /* Override general input margin */
 }
  html[data-theme="dark"] .subtitle-upload-form input[type="file"] {
-     background-color: var(--input-bg); /* Use input background color */
+     background-color: var(--input-bg);
      border-color: var(--input-border);
  }
+ .subtitle-upload-form button {
+     margin: 0;
+     padding: calc(var(--element-padding-y) * 0.75) calc(var(--element-padding-x) * 0.75);
+     font-size: 0.9em;
+     flex-shrink: 0;
+     margin-bottom: 0; /* Override general button margin */
+ }
 
-
- /* Modal Styles */
+ /* --- Modal Styles --- */
  .modal {
-    /* ... existing styles ... */
-    background-color: var(--shadow-color-modal); /* USE VAR for overlay */
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    overflow: hidden; /* Prevent modal scroll, content scrolls */
+    background-color: var(--shadow-color-modal);
+    animation: fadeIn 0.3s ease-out;
  }
- .modal-content { /* General modal content */
-     background-color: var(--modal-bg); /* USE VAR */
-     border: 1px solid var(--border-color); /* Add border */
-     box-shadow: 0 5px 15px var(--shadow-color); /* Use subtle shadow */
-     /* ... rest of existing styles ... */
-     transition: background-color 0.3s, border-color 0.3s;
+ .modal-content {
+    background-color: var(--modal-bg);
+    margin: 5% auto; /* Center vertically (approx) */
+    padding: var(--container-padding);
+    border: 1px solid var(--border-color);
+    width: 90%;
+    max-width: 800px; /* Max width on large screens */
+    position: relative;
+    border-radius: var(--border-radius);
+    box-shadow: 0 5px 15px var(--shadow-color);
+    animation: slideIn 0.3s ease-out;
+    transition: background-color 0.3s, border-color 0.3s;
+    display: flex; /* Enable flexbox for content layout */
+    flex-direction: column; /* Stack header, status, list vertically */
+    max-height: 85vh; /* Limit modal height */
  }
- #shortsModalContent { /* Specific modal content - inherits from .modal-content */
-     /* ... existing styles ... */
-     /* Overrides if necessary */
-     background-color: var(--modal-bg); /* Ensure it uses the var */
- }
-
  .close-button {
-      /* ... existing styles ... */
-      color: var(--close-button-color); /* USE VAR */
+    z-index: 10;
+    position: absolute;
+    top: calc(var(--spacing-unit) / 2);
+    right: var(--spacing-unit);
+    font-size: 2rem; /* Larger tap target */
+    font-weight: bold;
+    cursor: pointer;
+    color: var(--close-button-color);
+    line-height: 1;
+    background: none;
+    border: none;
+    padding: calc(var(--spacing-unit) / 4); /* Add slight padding */
+    width: auto; /* Override button width */
+    margin: 0; /* Override button margin */
  }
- .close-button:hover {
-      color: var(--close-button-hover); /* USE VAR */
- }
+ .close-button:hover { color: var(--close-button-hover); }
+
  #modalVideo {
-     /* ... existing styles ... */
-     background-color: #000; /* Keep video player background black */
+    width: 100%;
+    max-height: 70vh; /* Limit video height within modal */
+    height: auto;
+    background-color: #000;
+    border-radius: var(--border-radius);
+    display: block;
+    margin-top: var(--spacing-unit); /* Space below title */
  }
 
- /* Shorts List Styling (Inside Modal) */
+ /* --- Shorts List Styling (Inside Modal) --- */
+ #shortsModalContent h3 {
+     padding-right: 40px; /* Ensure title doesn't overlap close button */
+     margin-bottom: calc(var(--spacing-unit)/2); /* Less space below title */
+ }
+ #shortsModalContent .status {
+      margin-top: 0; /* Status immediately below title */
+      margin-bottom: var(--spacing-unit);
+ }
  #shortsList {
-    /* ... existing styles ... */
-    /* No background change needed, parent modal handles it */
+    margin-top: 0;
+    flex-grow: 1; /* Allows the list to take available vertical space */
+    overflow-y: auto; /* Enables vertical scrolling ONLY for the list */
+    padding-right: calc(var(--spacing-unit) / 2); /* Space for scrollbar */
+    margin-right: calc(-1 * var(--spacing-unit) / 2); /* Counteract padding for full width look */
  }
  #shortsList .short-item {
-     border: 1px solid var(--medium-gray); /* USE VAR */
-     background-color: var(--bg-color); /* Use main dark background for item */
-     /* ... existing styles ... */
-     box-shadow: 0 1px 3px var(--shadow-color-light); /* USE VAR */
+     border: 1px solid var(--border-color);
+     background-color: var(--bg-color); /* Use main background */
+     padding: var(--spacing-unit);
+     margin-bottom: var(--spacing-unit);
+     border-radius: var(--border-radius);
+     box-shadow: 0 1px 3px var(--shadow-color-light);
      transition: background-color 0.3s, border-color 0.3s;
-}
- #shortsList .short-time,
- #shortsList .short-actions {
-      border-top: 1px dashed var(--border-color); /* USE VAR */
+ }
+ html[data-theme="dark"] #shortsList .short-item {
+     background-color: var(--section-bg); /* Darker background for items */
+ }
+ #shortsList .short-item:last-child { margin-bottom: 0; }
+ #shortsList p { margin: 5px 0 10px 0; font-size: 0.95rem; }
+ #shortsList .short-info strong { font-size: 1.1em;}
+ #shortsList .short-time, #shortsList .short-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: calc(var(--gap) / 2);
+      margin-top: var(--spacing-unit);
+      padding-top: var(--spacing-unit);
+      border-top: 1px dashed var(--border-color);
+ }
+ #shortsList .short-time label {
+     font-weight: normal;
+     margin: 0;
+     font-size: 0.9em;
+     display: inline-block;
+     width: auto;
+     flex-shrink: 0;
  }
  #shortsList .short-time input[type="text"] {
-      border: 1px solid var(--medium-gray); /* USE VAR */
-      background-color: var(--input-bg); /* Use input bg */
-      color: var(--text-color); /* Use text color */
+     padding: calc(var(--element-padding-y) * 0.75) calc(var(--element-padding-x) * 0.75);
+     font-size: 0.9em;
+     margin: 0;
+     border: 1px solid var(--medium-gray);
+     flex: 1 1 80px; /* Flexible width, base 80px */
+     min-width: 80px;
+     max-width: 120px;
+     width: auto;
+     background-color: var(--input-bg);
+     color: var(--text-color);
+     margin-bottom: 0; /* Override */
+ }
+ #shortsList .short-time button, #shortsList .short-actions button {
+     padding: calc(var(--element-padding-y) * 0.75) calc(var(--element-padding-x) * 0.75);
+     font-size: 0.85em;
+     margin: 0;
+     flex-shrink: 0;
+     margin-bottom: 0; /* Override */
  }
 
-/* Update toggle text color */
-html[data-theme="dark"] .theme-switch-wrapper em {
-    color: var(--text-color);
+/* Suggest Buttons inside Modal */
+.empty-shorts-message, .suggest-more-container {
+    padding: var(--spacing-unit);
+    text-align: center;
+    margin-top: var(--spacing-unit);
+}
+.suggest-button {
+    margin-top: calc(var(--spacing-unit) / 2);
+}
+p.info-message { /* Style simple messages in the shorts list */
+    padding: var(--spacing-unit);
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
 }
 
-/* Responsive: Adjust toggle position if needed */
-@media (max-width: 768px) {
-    .theme-switch-wrapper {
-        top: 10px;
-        right: 10px;
-    }
-    /* You might hide the "Toggle Dark Mode" text on small screens */
-    /* .theme-switch-wrapper em { display: none; } */
+ /* --- Animations --- */
+ @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+ @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* --- Responsive Adjustments --- */
+
+/* Smaller Devices (Phones) */
+@media (max-width: 576px) {
+    html { font-size: 14px; } /* Smaller base font */
+    body { padding: calc(var(--spacing-unit) / 2); }
+    .app-header { padding-bottom: calc(var(--spacing-unit)/2); margin-bottom: var(--spacing-unit); }
+    .app-header h1 { font-size: 1.5rem; }
+    .theme-switch-wrapper .toggle-label { display: none; } /* Hide text label */
+    .content-section { padding: var(--spacing-unit); } /* Less padding */
+    h2 { font-size: 1.3rem; }
+
+    /* Reduce min-width for table slightly more if needed */
+    #videosTable { min-width: 600px; }
+    #videosTable th, #videosTable td { padding: calc(var(--element-padding-y)*0.75) calc(var(--element-padding-x)*0.75); font-size: 0.9rem; }
+
+    /* Modal on small screens */
+    .modal-content { width: 95%; margin: 2% auto; max-height: 90vh;}
+    #shortsModalContent h3 { font-size: 1.15rem; }
+
+    #shortsList .short-time { flex-direction: column; align-items: stretch; } /* Stack time inputs/button */
+    #shortsList .short-time input[type="text"] { max-width: none; } /* Allow full width when stacked */
+
+}
+
+/* Medium Devices (Tablets) */
+@media (min-width: 768px) {
+    /* Optional: Increase max-width slightly for modals if desired */
+    /* .modal-content { max-width: 720px; } */
+    /* #shortsModalContent { max-width: 900px; } */
 }

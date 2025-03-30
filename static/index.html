@@ -7,66 +7,76 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Video Shorts Generator</h1>
-    <!-- Dark Mode Toggle Start -->
-    <div class="theme-switch-wrapper">
-        <label class="theme-switch" for="darkModeToggle">
-            <input type="checkbox" id="darkModeToggle" />
-            <span class="slider round"></span>
-        </label>
-        <em>Toggle Dark Mode</em>
-    </div>
-    <!-- Added container div for upload section styling -->
-    <div id="uploadSectionContainer">
-        <div id="uploadSection">
-             <h2>Upload New Video</h2>
-             <form id="uploadForm" enctype="multipart/form-data">
-                 <div>
-                     <label for="video">1. Select Video File (Required):</label>
-                     <input type="file" id="video" name="video" accept="video/*,.mkv,.mov,.avi,.wmv" required>
-                 </div>
-                 <div>
-                     <label for="subtitle">2. Select Subtitle File (Optional .srt/.vtt):</label>
-                     <input type="file" id="subtitle" name="subtitle" accept=".srt,.vtt">
-                 </div>
-                 <div>
-                     <label for="zoomFactor">3. Zoom Factor (e.g., 1.5, 2.0):</label>
-                     <input type="number" id="zoomFactor" name="zoom_factor" step="0.1" min="1" value="2.0"> <!-- Added zoom factor input -->
-                 </div>
-                 <button type="submit">Upload & Process</button>
-             </form>
-             <div id="uploadStatus" class="status"></div>
-         </div>
-    </div>
+    <!-- Dark Mode Toggle Moved to Header Area -->
+    <header class="app-header">
+        <h1>Video Shorts Generator</h1>
+        <!-- Dark Mode Toggle Start -->
+        <div class="theme-switch-wrapper">
+            <label class="theme-switch" for="darkModeToggle">
+                <input type="checkbox" id="darkModeToggle" />
+                <span class="slider round"></span>
+            </label>
+            <em class="toggle-label">Dark Mode</em>
+        </div>
+        <!-- Dark Mode Toggle End -->
+    </header>
 
-    <!-- Added container div for table section styling -->
-    <div id="videosTableContainer">
-        <h2>Manage Videos</h2>
-        <div id="listStatus" class="status"></div>
-        <!-- Table itself is inside -->
-        <table id="videosTable">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Details</th>
-                    <th>Full Video</th>
-                    <th>Shorts</th>
-                    <th>Actions & Subtitles</th>
-                </tr>
-            </thead>
-            <tbody><!-- Video rows will be inserted here --></tbody>
-        </table>
-    </div>
+    <div class="main-container">
+        <!-- Container div for upload section styling -->
+        <div id="uploadSectionContainer" class="content-section">
+            <div id="uploadSection">
+                 <h2>Upload New Video</h2>
+                 <form id="uploadForm" enctype="multipart/form-data">
+                     <div>
+                         <label for="video">1. Select Video File (Required):</label>
+                         <input type="file" id="video" name="video" accept="video/*,.mkv,.mov,.avi,.wmv" required>
+                     </div>
+                     <div>
+                         <label for="subtitle">2. Select Subtitle File (Optional .srt/.vtt):</label>
+                         <input type="file" id="subtitle" name="subtitle" accept=".srt,.vtt">
+                     </div>
+                     <div>
+                         <label for="zoomFactor">3. Zoom Factor (e.g., 1.5, 2.0):</label>
+                         <input type="number" id="zoomFactor" name="zoom_factor" step="0.1" min="1" value="2.0">
+                     </div>
+                     <button type="submit">Upload & Process</button>
+                 </form>
+                 <div id="uploadStatus" class="status"></div>
+             </div>
+        </div>
+
+        <!-- Container div for table section styling -->
+        <div id="videosTableContainerWrapper" class="content-section">
+            <h2>Manage Videos</h2>
+            <div id="listStatus" class="status"></div>
+            <!-- Added wrapper for overflow -->
+            <div id="videosTableContainer">
+                 <table id="videosTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Details</th>
+                            <th>Full Video</th>
+                            <th>Shorts</th>
+                            <th>Actions & Subtitles</th>
+                        </tr>
+                    </thead>
+                    <tbody><!-- Video rows will be inserted here --></tbody>
+                </table>
+            </div>
+        </div>
+    </div> <!-- End main-container -->
 
     <!-- Shorts Modal -->
     <div id="shortsModal" class="modal">
         <div class="modal-content" id="shortsModalContent">
-            <button class="close-button" onclick="closeShortsModal()" aria-label="Close Modal">×</button>
-            <h3 id="shortsModalTitle">Shorts</h3>
+             <button class="close-button" onclick="closeShortsModal()" aria-label="Close Modal">×</button>
+             <h3 id="shortsModalTitle">Shorts</h3>
              <div id="shortsModalStatus" class="status"></div>
-            <div id="shortsList">
+             <!-- This div will scroll -->
+             <div id="shortsList">
                  <!-- Short items will be inserted here -->
-            </div>
+             </div>
         </div>
     </div>
 
@@ -74,8 +84,8 @@
     <div id="videoModal" class="modal">
         <div class="modal-content" id="videoModalContent">
             <button class="close-button" onclick="closeVideoModal()" aria-label="Close Player">×</button>
-             <h4 id="videoModalTitle" style='margin-top:0; margin-bottom: 10px;'>Video Player</h4>
-            <video id="modalVideo" controls controlsList="nodownload"></video> <!-- Added controlsList -->
+            <h4 id="videoModalTitle" style='margin-top:0; margin-bottom: 10px;'>Video Player</h4>
+            <video id="modalVideo" controls controlsList="nodownload"></video>
         </div>
     </div>
 
@@ -326,32 +336,32 @@
 
                 // --- Build Row HTML ---
                 row.innerHTML = `
-                    <td>${video.id}</td>
-                    <td>
+                    <td data-label="ID">${video.id}</td>
+                    <td data-label="Details">
                         <strong>${video.title || 'Untitled Video'}</strong><br>
-                        <small title="${video.original_filename}">Filename: ${video.original_filename}</small><br>
-                        Status: <strong class="${getVideoStatusClass(video.status)}">${video.status}</strong>
+                        <small class="filename" title="${video.original_filename}">Filename: ${video.original_filename}</small><br>
+                        Status: <strong class="${getVideoStatusClass(video.status)} status-inline">${video.status}</strong>
                         ${hasUploadedSubs
-                            ? `<br><small title="Using uploaded subtitle: ${video.uploaded_subtitle_filename}">Using Subs: ${video.uploaded_subtitle_filename.substring(0, 20)}${video.uploaded_subtitle_filename.length > 20 ? '...' : ''}</small>`
+                            ? `<br><small class="subtitle-info" title="Using uploaded subtitle: ${video.uploaded_subtitle_filename}">Using Subs: ${video.uploaded_subtitle_filename}</small>`
                             : ''}
                         ${!hasUploadedSubs && video.status === 'completed' && video.has_subtitle_content
-                            ? `<br><small>Using Generated Subs</small>`
+                            ? `<br><small class="subtitle-info">Using Generated Subs</small>`
                             : ''}
                          ${video.status === 'failed' && video.error_message
-                            ? `<br><small style="color: var(--danger-color);" title="${video.error_message}">Error: ${video.error_message.substring(0, 50)}${video.error_message.length > 50 ? '...' : ''}</small>` : ''}
+                            ? `<br><small class="error-message" title="${video.error_message}">Error: ${video.error_message}</small>` : ''}
                     </td>
-                    <td style="text-align: center;">
+                    <td data-label="Full Video">
                         <button onclick="playVideo('${video.edited_video_url}', 'Full Video: ${(video.title || video.original_filename).replace(/'/g, "\\'")}')" ${!video.edited_video_url || isProcessing ? 'disabled' : ''} title="${video.edited_video_url && !isProcessing ? 'Play the full edited video' : (isProcessing ? 'Video processing' : 'Video not available')}">
                             Play Full
                         </button>
                     </td>
-                    <td style="text-align: center;">
+                    <td data-label="Shorts">
                         <button onclick="showShorts(${video.id})" ${shortsButtonDisabled} title="${shortsButtonTitle}">
                             ${shortsButtonText}
                         </button>
                         ${shortsButtonSmallText ? `<br><small>${shortsButtonSmallText}</small>` : ''}
                     </td>
-                    <td>
+                    <td data-label="Actions & Subtitles">
                          <div class="button-group">
                             <button class="danger" onclick="deleteVideo(${video.id})" title="Delete video and all related files">Delete</button>
                             <button onclick="reprocessSuggestions(${video.id})" ${!canReprocessSuggestions ? 'disabled' : ''} title="${canReprocessSuggestions ? 'Generate new short suggestions using current subtitle content' : 'Requires completed video with subtitle content'}">Regen Suggestions</button>
@@ -672,6 +682,7 @@
             setStatus('shortsModalStatus', 'Loading shorts data...', false, 0);
             document.getElementById('shortsModal').style.display = 'block';
             document.body.style.overflow = 'hidden'; // Prevent background scroll
+            document.body.classList.add('modal-open'); // Add class to body
 
             // Initial fetch and render for the modal
             const shorts = await fetchShortsForVideo(videoId);
@@ -726,9 +737,10 @@
                             setStatus('shortsModalStatus', '');
                          }
                          // Optional: Could stop the interval if nothing is processing anymore
-                         clearInterval(refreshIntervalId);
-                         refreshIntervalId = null;
-                         console.log("Interval: Stable state reached, stopping interval.");
+                         // *** Keep interval running if modal is open, to potentially catch manual refreshes or unexpected state changes ***
+                         // clearInterval(refreshIntervalId);
+                         // refreshIntervalId = null;
+                         // console.log("Interval: Stable state reached, stopping interval.");
                      }
 
                  }, REFRESH_INTERVAL_MS);
@@ -753,12 +765,12 @@
 
              // --- Handle Different Video States ---
              if (isProcessingStatus(video.status)) {
-                 shortsList.innerHTML = `<p>Main video is currently ${video.status}. Shorts management unavailable.</p>`;
+                 shortsList.innerHTML = `<p class="info-message">Main video is currently ${video.status}. Shorts management unavailable.</p>`;
                  // Status message is handled by the interval/load function
                  return;
              }
              if (video.status === 'failed') {
-                  shortsList.innerHTML = `<p>Main video processing failed. Shorts management unavailable.</p>`;
+                  shortsList.innerHTML = `<p class="info-message">Main video processing failed. Shorts management unavailable.</p>`;
                   // Status message is handled by the interval/load function
                   return;
              }
@@ -767,10 +779,10 @@
              if (video.status === 'completed' && shorts.length === 0) {
                  if (hasSuggestibleContent) {
                      // Provide button to trigger initial suggestion
-                     shortsList.innerHTML = `<p>No shorts suggested yet.</p><button onclick="reprocessSuggestions(${videoId})">Suggest Shorts Now</button>`;
+                     shortsList.innerHTML = `<div class="empty-shorts-message"><p>No shorts suggested yet.</p><button class="suggest-button" onclick="reprocessSuggestions(${videoId})">Suggest Shorts Now</button></div>`;
                  } else {
                       // No content to suggest from
-                      shortsList.innerHTML = '<p>No shorts created yet, and no subtitle content found to generate suggestions.</p>';
+                      shortsList.innerHTML = '<p class="info-message">No shorts created yet, and no subtitle content found to generate suggestions.</p>';
                  }
                  return; // Stop here if no shorts to display
              }
@@ -815,25 +827,25 @@
                      <div class="short-info">
                          <p><strong>${safeShortName}</strong></p>
                          ${safeShortDesc ? `<p><small>${safeShortDesc}</small></p>` : ''}
-                         <p>Status: <strong class="${getVideoStatusClass(short.status)}">${short.status}</strong></p>
-                         ${shortIsFailed && short.error_message ? `<p><small style="color: var(--danger-color);">Error: ${short.error_message.replace(/</g, "<").replace(/>/g, ">")}</small></p>` : ''}
+                         <p>Status: <strong class="${getVideoStatusClass(short.status)} status-inline">${short.status}</strong></p>
+                         ${shortIsFailed && short.error_message ? `<p><small class="error-message">Error: ${short.error_message.replace(/</g, "<").replace(/>/g, ">")}</small></p>` : ''}
                      </div>
                      <div class="short-time short-time-inputs">
                          <label for="start-${short.id}">Start:</label>
                          <input type="text" value="${short.start_time || ''}" id="start-${short.id}" pattern="\\d{1,3}:\\d{2}:\\d{2}(\\.\\d+)?" title="H:MM:SS or HH:MM:SS or H:MM:SS.ms" ${!canUpdateTimes ? 'disabled' : ''}>
                          <label for="end-${short.id}">End:</label>
                          <input type="text" value="${short.end_time || ''}" id="end-${short.id}" pattern="\\d{1,3}:\\d{2}:\\d{2}(\\.\\d+)?" title="H:MM:SS or HH:MM:SS or H:MM:SS.ms" ${!canUpdateTimes ? 'disabled' : ''}>
-                         <button onclick="updateShort(${videoId}, ${short.id})" title="Save time changes (resets status to pending if completed)" ${!canUpdateTimes ? 'disabled' : ''}>Update Times</button>
+                         <button onclick="updateShort(${videoId}, ${short.id})" title="Save time changes (resets status to pending if completed)" ${!canUpdateTimes ? 'disabled' : ''}>Update</button> <!-- Shorter text -->
                      </div>
-                     <div class="short-actions">
+                     <div class="short-actions button-group"> <!-- Re-use button-group class -->
                          <button onclick="createShort(${videoId}, ${short.id})" ${!canCreate ? 'disabled' : ''} title="${canCreate ? 'Generate this short video' : (shortIsActivelyProcessing ? 'Processing...' : 'Already created/completed')}">
-                            ${shortIsFailed ? 'Retry Create' : 'Create'}
+                            ${shortIsFailed ? 'Retry' : 'Create'}
                          </button>
                          <button onclick="recreateShort(${videoId}, ${short.id})" ${!canRecreate ? 'disabled' : ''} title="${canRecreate ? 'Re-generate this short video (overwrites existing)' : (shortIsActivelyProcessing ? 'Processing...' : 'Create first or status not applicable')}">
                              Recreate
                          </button>
                          <button onclick="playVideo('${short.short_url}', 'Short: ${safeShortName.replace(/'/g, "\\'")}')" ${!canPlay ? 'disabled' : ''} title="${canPlay ? 'Play the generated short' : (shortIsActivelyProcessing ? 'Processing...' : 'Short not ready or URL missing')}">
-                             Play Short
+                             Play
                          </button>
                          <button onclick="previewShort(${videoId}, ${short.id}, '${short.start_time || '0:00:00'}', '${short.end_time || '0:00:00'}')" ${!canPreview ? 'disabled' : ''} title="${canPreview ? 'Play the full video starting at this segment time' : 'Preview unavailable (missing full video or times)'}">
                              Preview
@@ -846,12 +858,15 @@
 
              // --- Add "Suggest More" Button (if applicable) ---
              if (video.status === 'completed' && hasSuggestibleContent) {
+                   const suggestMoreContainer = document.createElement('div');
+                   suggestMoreContainer.classList.add('suggest-more-container');
                    const suggestMoreButton = document.createElement('button');
                    suggestMoreButton.textContent = 'Suggest More Shorts';
                    suggestMoreButton.onclick = () => reprocessSuggestions(videoId); // Reuse the regenerate function
                    suggestMoreButton.title = 'Generate additional suggestions (may replace pending/failed ones)';
-                   suggestMoreButton.style.marginTop = '20px'; // Space above the button
-                   shortsList.appendChild(suggestMoreButton);
+                   suggestMoreButton.classList.add('suggest-button');
+                   suggestMoreContainer.appendChild(suggestMoreButton);
+                   shortsList.appendChild(suggestMoreContainer);
              }
          }
 
@@ -861,6 +876,7 @@
              const modal = document.getElementById(modalId);
              if (modal) modal.style.display = 'none';
              document.body.style.overflow = 'auto'; // Restore background scroll
+             document.body.classList.remove('modal-open'); // Remove class from body
 
              // If closing shorts modal, clear interval and reset tracking ID
              if (modalId === 'shortsModal') {
@@ -1027,6 +1043,7 @@
                 videoElement.src = playableUrl;
                 document.getElementById('videoModal').style.display = 'block';
                 document.body.style.overflow = 'hidden'; // Prevent background scroll
+                document.body.classList.add('modal-open'); // Add class to body
                 videoElement.play().catch(e => console.warn("Autoplay may be blocked by browser:", e));
             } else {
                 setStatus('listStatus', 'Video URL is not available for playback.', true, 5000);
@@ -1091,6 +1108,8 @@
              videoElement.src = playableUrl; // Set the new source
              videoModal.style.display = 'block';
              document.body.style.overflow = 'hidden';
+             document.body.classList.add('modal-open'); // Add class to body
+
 
              // Note: We don't auto-pause at end time for simplicity in this version.
         }
