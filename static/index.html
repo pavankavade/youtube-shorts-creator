@@ -85,7 +85,7 @@
         // Track modal state and refresh interval
         let currentModalVideoId = null;
         let refreshIntervalId = null; // Interval ID for clearing
-        const REFRESH_INTERVAL_MS = 30000; // Refresh every 7 seconds
+        const REFRESH_INTERVAL_MS = 30000;
         const toggleSwitch = document.getElementById('darkModeToggle');
         const currentTheme = localStorage.getItem('theme');
 
@@ -183,6 +183,28 @@
                 timeout = setTimeout(later, wait);
             };
         }
+
+        // Helper function to convert HH:MM:SS string to seconds
+        function timeStringToSeconds(timeStr) {
+             if (!timeStr || !/^\d{1,3}:\d{2}:\d{2}(\.\d+)?$/.test(timeStr)) {
+                 console.error("Invalid time format for conversion:", timeStr);
+                 return 0; // Return 0 on invalid format
+             }
+             try {
+                 const parts = timeStr.split(':');
+                 const h = parseInt(parts[0], 10);
+                 const m = parseInt(parts[1], 10);
+                 const s = parseFloat(parts[2]); // Use parseFloat for potential milliseconds
+                 if (isNaN(h) || isNaN(m) || isNaN(s) || m >= 60 || s >= 60) {
+                     throw new Error("Invalid time component value");
+                 }
+                 return h * 3600 + m * 60 + s;
+             } catch (e) {
+                 console.error("Error parsing time string:", timeStr, e);
+                 return 0; // Return 0 on error
+             }
+         }
+
 
         // --- API Fetch Functions ---
         async function fetchWithCacheBust(url, options = {}) {
@@ -400,7 +422,9 @@
         // Helper to check if shorts list contains items needing refresh
         function shouldRefreshShorts(shorts) {
             if (!Array.isArray(shorts)) return false;
-            return shorts.some(short => isProcessingStatus(short.status));
+            // *** MODIFICATION: Only consider 'processing' and 'queued' as needing refresh for short item itself ***
+            // 'pending' and 'failed' are stable states that don't require automatic refresh.
+            return shorts.some(short => ['processing', 'queued'].includes(short.status));
         }
 
 
@@ -686,6 +710,7 @@
                      console.log(`Interval check: Modal video ${currentModalVideoId}, status: ${video.status}, shorts count: ${video.shorts?.length || 0}`);
 
                      // Determine if a refresh of video/shorts data is needed
+                     // Check main video status OR if any short is actively processing/queued
                      const needsRefresh = isProcessingStatus(video.status) || shouldRefreshShorts(video.shorts);
                      // Also refresh if video just completed and might now have suggestible content without shorts
                      const justCompletedAndSuggestible = video.status === 'completed' && video.has_subtitle_content && (!video.shorts || video.shorts.length === 0);
@@ -758,26 +783,40 @@
              });
 
              shorts.forEach(short => {
-                 const shortIsProcessing = isProcessingStatus(short.status);
+                 // *** MODIFICATION START ***
+                 // Determine if short is actively being processed (cannot edit/create then)
+                 const shortIsActivelyProcessing = short.status === 'processing' || short.status === 'queued';
+
+                 // Determine other states
                  const shortIsCompleted = short.status === 'completed';
                  const shortIsFailed = short.status === 'failed';
-                 const shortIsPending = short.status === 'pending'; // Initial state after suggestion
+                 const shortIsPending = short.status === 'pending'; // Initial suggested state
 
-                 const canCreate = shortIsPending || shortIsFailed; // Can create if pending or failed
-                 const canRecreate = shortIsCompleted || shortIsFailed; // Can recreate if completed or failed
+                 // Button logic based on new understanding
+                 const canCreate = (shortIsPending || shortIsFailed) && !shortIsActivelyProcessing; // Can create if pending/failed AND not actively processing
+                 const canRecreate = (shortIsCompleted || shortIsFailed) && !shortIsActivelyProcessing; // Can recreate if completed/failed AND not actively processing
                  const canPlay = shortIsCompleted && !!short.short_url;
-                 const canUpdateTimes = !shortIsProcessing; // Can update times unless actively processing
+                 // Allow updating times unless the short is *actively* processing ('processing' or 'queued')
+                 const canUpdateTimes = !shortIsActivelyProcessing;
+                 const canPreview = !!video.edited_video_url && !!short.start_time && !!short.end_time; // Preview requires main video + times
+                 // *** MODIFICATION END ***
+
 
                  const shortDiv = document.createElement('div');
                  shortDiv.className = 'short-item';
                  shortDiv.dataset.shortId = short.id; // Store ID for actions
 
+                 // Escape potential HTML in names/descriptions
+                 const safeShortName = (short.short_name || `Short ${short.id}`).replace(/</g, "<").replace(/>/g, ">");
+                 const safeShortDesc = (short.short_description || '').replace(/</g, "<").replace(/>/g, ">");
+
+
                  shortDiv.innerHTML = `
                      <div class="short-info">
-                         <p><strong>${short.short_name || `Short ${short.id}`}</strong></p>
-                         ${short.short_description ? `<p><small>${short.short_description}</small></p>` : ''}
+                         <p><strong>${safeShortName}</strong></p>
+                         ${safeShortDesc ? `<p><small>${safeShortDesc}</small></p>` : ''}
                          <p>Status: <strong class="${getVideoStatusClass(short.status)}">${short.status}</strong></p>
-                         ${shortIsFailed && short.error_message ? `<p><small style="color: var(--danger-color);">Error: ${short.error_message}</small></p>` : ''}
+                         ${shortIsFailed && short.error_message ? `<p><small style="color: var(--danger-color);">Error: ${short.error_message.replace(/</g, "<").replace(/>/g, ">")}</small></p>` : ''}
                      </div>
                      <div class="short-time short-time-inputs">
                          <label for="start-${short.id}">Start:</label>
@@ -787,14 +826,17 @@
                          <button onclick="updateShort(${videoId}, ${short.id})" title="Save time changes (resets status to pending if completed)" ${!canUpdateTimes ? 'disabled' : ''}>Update Times</button>
                      </div>
                      <div class="short-actions">
-                         <button onclick="createShort(${videoId}, ${short.id})" ${!canCreate ? 'disabled' : ''} title="${canCreate ? 'Generate this short video' : (shortIsProcessing ? 'Processing...' : 'Already created')}">
+                         <button onclick="createShort(${videoId}, ${short.id})" ${!canCreate ? 'disabled' : ''} title="${canCreate ? 'Generate this short video' : (shortIsActivelyProcessing ? 'Processing...' : 'Already created/completed')}">
                             ${shortIsFailed ? 'Retry Create' : 'Create'}
                          </button>
-                         <button onclick="recreateShort(${videoId}, ${short.id})" ${!canRecreate ? 'disabled' : ''} title="${canRecreate ? 'Re-generate this short video (overwrites existing)' : (shortIsProcessing ? 'Processing...' : 'Create first')}">
+                         <button onclick="recreateShort(${videoId}, ${short.id})" ${!canRecreate ? 'disabled' : ''} title="${canRecreate ? 'Re-generate this short video (overwrites existing)' : (shortIsActivelyProcessing ? 'Processing...' : 'Create first or status not applicable')}">
                              Recreate
                          </button>
-                         <button onclick="playVideo('${short.short_url}', 'Short: ${(short.short_name || `Short ${short.id}`).replace(/'/g, "\\'")}')" ${!canPlay ? 'disabled' : ''} title="${canPlay ? 'Play the generated short' : (shortIsProcessing ? 'Processing...' : 'Short not ready or URL missing')}">
+                         <button onclick="playVideo('${short.short_url}', 'Short: ${safeShortName.replace(/'/g, "\\'")}')" ${!canPlay ? 'disabled' : ''} title="${canPlay ? 'Play the generated short' : (shortIsActivelyProcessing ? 'Processing...' : 'Short not ready or URL missing')}">
                              Play Short
+                         </button>
+                         <button onclick="previewShort(${videoId}, ${short.id}, '${short.start_time || '0:00:00'}', '${short.end_time || '0:00:00'}')" ${!canPreview ? 'disabled' : ''} title="${canPreview ? 'Play the full video starting at this segment time' : 'Preview unavailable (missing full video or times)'}">
+                             Preview
                          </button>
                          <!-- <button class="danger" onclick="deleteShort(${videoId}, ${short.id})" title="Delete this short (Not Implemented)">Delete Short</button> -->
                      </div>
@@ -840,7 +882,9 @@
                   if (video) {
                       video.pause();
                       video.removeAttribute('src'); // Release the source
-                      video.load(); // Reset
+                      // Remove event listeners that might have been added by previewShort
+                      // (Direct removal is hard if function was defined inline, but resetting src helps)
+                      video.load(); // Reset video element state
                   }
                   document.getElementById('videoModalTitle').textContent = 'Video Player'; // Reset title
              }
@@ -916,23 +960,17 @@
                 return;
             }
 
-            // Convert to seconds for comparison (ignoring milliseconds for comparison)
-            const timeToSec = (t) => {
-                const parts = t.split('.')[0].split(':'); // Ignore ms part for comparison
-                return parts.reduce((acc, time) => (60 * acc) + parseInt(time, 10), 0);
-            }
-             try {
-                  if (timeToSec(startTime) >= timeToSec(endTime)) {
-                      setStatus('shortsModalStatus', 'Start time must be before end time.', true, 5000);
-                      return;
-                  }
-             } catch (e) {
-                  setStatus('shortsModalStatus', 'Invalid time value entered.', true, 5000);
-                  return;
-             }
+            // Convert to seconds for comparison (using new helper)
+            const startSec = timeStringToSeconds(startTime);
+            const endSec = timeStringToSeconds(endTime);
 
-             setStatus('shortsModalStatus', `Updating times for short ${shortId}...`, false, 0); // Persistent
-             if(updateButton) updateButton.disabled = true;
+            if (startSec >= endSec) {
+               setStatus('shortsModalStatus', 'Start time must be before end time.', true, 5000);
+               return;
+            }
+
+            setStatus('shortsModalStatus', `Updating times for short ${shortId}...`, false, 0); // Persistent
+            if(updateButton) updateButton.disabled = true;
 
              try {
                   const response = await fetchWithCacheBust(`/videos/${videoId}/shorts/${shortId}/update`, {
@@ -979,7 +1017,14 @@
                 const videoElement = document.getElementById('modalVideo');
                 // Add cache buster to video URL to ensure fresh playback
                 const separator = url.includes('?') ? '&' : '?';
-                videoElement.src = `${url}${separator}_=${new Date().getTime()}`;
+                const playableUrl = `${url}${separator}_=${new Date().getTime()}`;
+
+                // Remove potential 'loadedmetadata' listener from preview before setting new src
+                // This is tricky if the listener is anonymous. Resetting src usually helps.
+                // We rely on closeVideoModal to reset the video element state.
+
+                console.log(`Playing video: ${playableUrl}`);
+                videoElement.src = playableUrl;
                 document.getElementById('videoModal').style.display = 'block';
                 document.body.style.overflow = 'hidden'; // Prevent background scroll
                 videoElement.play().catch(e => console.warn("Autoplay may be blocked by browser:", e));
@@ -987,6 +1032,69 @@
                 setStatus('listStatus', 'Video URL is not available for playback.', true, 5000);
             }
         }
+
+        // Function to handle short preview
+        function previewShort(videoId, shortId, startTimeStr, endTimeStr) {
+             const videoData = videosData[videoId];
+             if (!videoData || !videoData.edited_video_url) {
+                 setStatus('shortsModalStatus', 'Full edited video URL not found for preview.', true, 5000);
+                 return;
+             }
+             const fullVideoUrl = videoData.edited_video_url;
+             const shortData = videoData.shorts?.find(s => s.id === shortId);
+             const shortName = (shortData?.short_name || `Short ${shortId}`).replace(/</g, "<").replace(/>/g, ">");
+
+             const startSeconds = timeStringToSeconds(startTimeStr);
+             if (startSeconds === null) { // Check if conversion failed
+                  setStatus('shortsModalStatus', `Invalid start time format: ${startTimeStr}`, true, 5000);
+                  return;
+             }
+
+             const videoElement = document.getElementById('modalVideo');
+             const videoModal = document.getElementById('videoModal');
+             const videoTitleElement = document.getElementById('videoModalTitle');
+
+             // Set title immediately
+             const previewTitle = `Preview: ${shortName} (from ${startTimeStr})`;
+             videoTitleElement.textContent = previewTitle;
+
+             // Add cache buster
+             const separator = fullVideoUrl.includes('?') ? '&' : '?';
+             const playableUrl = `${fullVideoUrl}${separator}_=${new Date().getTime()}`;
+
+             // Define the function to seek when metadata is loaded
+             const seekOnLoad = () => {
+                 // Check if the video source is still the one we intended to seek
+                 // Use playableUrl which includes the cache buster for comparison
+                 if (videoElement.currentSrc === playableUrl) {
+                      console.log(`Preview: Metadata loaded for ${playableUrl}. Seeking to ${startSeconds}s`);
+                      videoElement.currentTime = startSeconds;
+                      videoElement.play().catch(e => console.warn("Preview autoplay may be blocked:", e));
+                 } else {
+                      console.log(`Preview: Source changed before seek could happen. Expected: ${playableUrl}, Actual: ${videoElement.currentSrc}`);
+                 }
+                 // IMPORTANT: Remove listener *after* execution to prevent multiple seeks on the same load
+                 videoElement.removeEventListener('loadedmetadata', seekOnLoad);
+             };
+
+             // Remove any previous listener before adding a new one
+             // We rely on closeVideoModal resetting the element, and add the listener fresh here.
+             // Make sure to remove the specific function instance if attached multiple times
+             videoElement.removeEventListener('loadedmetadata', seekOnLoad); // Remove first just in case
+             videoElement.addEventListener('loadedmetadata', seekOnLoad);
+
+             // Set src (which triggers loading) and show modal
+             console.log(`Preview: Setting src to ${playableUrl}`);
+             // Reset video state before setting src to ensure 'loadedmetadata' fires reliably
+             videoElement.removeAttribute('src');
+             videoElement.load(); // Important to reset state
+             videoElement.src = playableUrl; // Set the new source
+             videoModal.style.display = 'block';
+             document.body.style.overflow = 'hidden';
+
+             // Note: We don't auto-pause at end time for simplicity in this version.
+        }
+
 
         // --- Delete Video ---
         async function deleteVideo(videoId) {
