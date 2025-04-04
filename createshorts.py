@@ -36,6 +36,8 @@ VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 EDITED_VIDEOS_DIR = os.path.join(DATA_DIR, "edited-videos")
 EDITED_SHORTS_DIR = os.path.join(DATA_DIR, "edited-shorts")
 AUDIO_DIR = os.path.join(DATA_DIR, "audio")
+MUSIC_DIR = os.path.join(DATA_DIR, "music")
+
 SUBTITLES_DIR = os.path.join(DATA_DIR, "subtitles") # Ensure this exists
 for dir_path in [DATA_DIR, VIDEOS_DIR, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR, AUDIO_DIR, SUBTITLES_DIR]:
     os.makedirs(dir_path, exist_ok=True)

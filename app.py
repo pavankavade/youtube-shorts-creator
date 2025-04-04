@@ -1,15 +1,24 @@
+import os
+import re
+import json
+import time
+import logging
+import threading
+import subprocess
+import socket
+
 from flask import Flask, request, jsonify, send_from_directory, url_for
 from flask_sqlalchemy import SQLAlchemy
-import threading
-import os
-import json
-import subprocess
+from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
+import google.generativeai as genai
+from google.generativeai import types as genai_types
+
 # Import the required functions from createshorts
 from createshorts import (
     process_video,
-    parse_srt, parse_vtt, # Import parsers
-    get_text_from_segments, # Import text extractor
+    parse_srt, parse_vtt,
+    get_text_from_segments,
     VIDEOS_DIR, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR, AUDIO_DIR, SUBTITLES_DIR
 )
 import google.generativeai as genai # Use the standard alias
@@ -34,8 +43,9 @@ VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 EDITED_VIDEOS_DIR = os.path.join(DATA_DIR, "edited-videos")
 EDITED_SHORTS_DIR = os.path.join(DATA_DIR, "edited-shorts")
 AUDIO_DIR = os.path.join(DATA_DIR, "audio")
+MUSIC_DIR = os.path.join(DATA_DIR, "music") 
 SUBTITLES_DIR = os.path.join(DATA_DIR, "subtitles") # Make sure this is defined
-for dir_path in [DATA_DIR, VIDEOS_DIR, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR, AUDIO_DIR, SUBTITLES_DIR]:
+for dir_path in [DATA_DIR, VIDEOS_DIR, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR, AUDIO_DIR, SUBTITLES_DIR, MUSIC_DIR]:
     os.makedirs(dir_path, exist_ok=True)
 # --- End Directories ---
 
@@ -672,8 +682,10 @@ def regenerate_suggestions(video_id):
 
 # --- process_short and time_to_seconds remain unchanged ---
 
-def process_short(video_id, short_id):
-    """Processes a single short segment. Should run in a separate thread."""
+# Find the existing process_short function and replace it with this modified version
+# Add audio_filename and audio_volume parameters
+def process_short(video_id, short_id, audio_filename=None, audio_volume=None):
+    """Processes a single short segment, optionally mixing in background audio. Runs in thread."""
     with app.app_context(): # Ensure DB access within thread
         short = None
         session = db.session # Use scoped session
@@ -699,8 +711,7 @@ def process_short(video_id, short_id):
 
             short.status = 'processing'
             session.commit()
-            logger.info(f"Starting short creation for short {short_id} (Video {video_id}).")
-
+            logger.info(f"Starting short creation for short {short_id} (Video {video_id}). Audio File: {audio_filename}, Background Volume %: {audio_volume}")
 
             if video.status != 'completed':
                  raise ValueError(f"Cannot create short {short_id}, main video {video_id} status is '{video.status}'.")
@@ -727,7 +738,6 @@ def process_short(video_id, short_id):
                 raise ValueError(f"Invalid duration ({duration_seconds}s) for short {short_id}")
 
             # --- Generate Filename ---
-            # (Filename generation logic remains the same)
             safe_short_name = re.sub(r'[^\w\-]+', '_', short.short_name or 'short').strip('_').lower()[:50]
             safe_desc_text = short.short_description or f"segment_{start_time_str.replace(':','')}_{end_time_str.replace(':','')}"
             safe_desc = re.sub(r'[^\w\-]+', '_', safe_desc_text).strip('_').lower()
@@ -737,53 +747,149 @@ def process_short(video_id, short_id):
             short_filename = f"{secure_filename(short_filename_base)}.mp4"
             short_path = os.path.join(EDITED_SHORTS_DIR, short_filename)
 
-            # --- FFmpeg Command (Re-encoding with Output Seeking) ---
-            # Always re-encode for accuracy with output seeking
-            ffmpeg_command = [
-                 "ffmpeg", "-loglevel", "warning", # Log level
-                 "-i", edited_video_path,           # Input file
-                 "-ss", str(start_seconds),       # Start time (Output Seeking - AFTER -i)
-                 "-t", str(duration_seconds),     # Duration of the clip
-                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                 "-c:a", "aac", "-b:a", "128k",
-                 "-avoid_negative_ts", "make_zero", # Handle potential timestamp issues
-                 "-map_metadata", "-1",             # Remove metadata
-                 "-movflags", "+faststart",         # Optimize for web
-                 "-y",                              # Overwrite output file
-                 short_path                         # Output file path
-             ]
+            # --- Prepare Audio Processing ---
+            add_audio = False
+            audio_input_path = None
+            # Default background volume multiplier (e.g., 25% if parsing fails or none selected)
+            # Let's keep the user-selected value, but ensure it can reach 0.25 for YT.
+            # The UI default is 5%, which is 0.05. The user *must* set it to 25% or higher in the UI if they want YT detection.
+            ffmpeg_bg_volume_multiplier = 0.25 # Default *if parsing fails*. Actual value comes from UI.
 
-            logger.info(f"Running ffmpeg (re-encode) for short {short_id}: {' '.join(ffmpeg_command)}")
-            # Use check=True, if re-encoding fails, it's a hard failure
-            result = subprocess.run(ffmpeg_command, check=True, capture_output=True, text=True) # Add check=True
+            # --- Hardcoded boost factor for main audio when background music is added ---
+            # Increase volume by 6dB (multiplier of 2.0). Adjust if needed.
+            MAIN_AUDIO_BOOST_FACTOR = 1.0
+            # ---------------------------------------------------------------------------
+
+            if audio_filename:
+                audio_input_path = os.path.join(MUSIC_DIR, audio_filename)
+                if os.path.exists(audio_input_path):
+                    try:
+                        vol_percent = int(audio_volume)
+                        if 0 <= vol_percent <= 100:
+                            # Convert 0-100% volume for BACKGROUND music to linear multiplier
+                            ffmpeg_bg_volume_multiplier = vol_percent / 100.0
+                            add_audio = True
+                            logger.info(f"Will mix in background audio '{audio_filename}' with background volume multiplier {ffmpeg_bg_volume_multiplier:.2f}. Main audio will be boosted by {MAIN_AUDIO_BOOST_FACTOR:.1f}x.")
+                        else:
+                            logger.warning(f"Invalid volume '{audio_volume}' provided for background. Must be 0-100. Ignoring background audio.")
+                    except (ValueError, TypeError):
+                        logger.warning(f"Could not parse background volume '{audio_volume}'. Ignoring background audio.")
+                else:
+                    logger.warning(f"Background audio file specified ('{audio_filename}') but not found at {audio_input_path}. Proceeding without adding background audio.")
+
+            # --- FFmpeg Command ---
+            ffmpeg_command = ["ffmpeg", "-loglevel", "warning", "-y"] # Base command, overwrite output
+
+            if add_audio:
+                # Command for cutting video, looping background audio, adjusting its volume,
+                # BOOSTING original audio, and mixing them.
+                ffmpeg_command.extend([
+                    # Inputs
+                    "-i", edited_video_path,                # Input 0: Original Video (with its audio)
+                    "-stream_loop", "-1",                   # Loop Input 1 indefinitely
+                    "-i", audio_input_path,                 # Input 1: Background Music (looped)
+
+                    # Time selection applied to the *output*
+                    "-ss", str(start_seconds),              # Start time offset for OUTPUT
+                    "-t", str(duration_seconds),            # Duration for OUTPUT
+
+                    # Complex Filtergraph
+                    "-filter_complex",
+                        # Boost volume of original audio (Input 0's audio [0:a])
+                        f"[0:a]volume=volume={MAIN_AUDIO_BOOST_FACTOR:.2f}[main_boosted];"
+                        # Adjust volume of background music (Input 1's audio [1:a])
+                        f"[1:a]volume=volume={ffmpeg_bg_volume_multiplier:.2f}[bg_vol];"
+                        # Mix boosted original audio [main_boosted] with adjusted background audio [bg_vol]
+                        "[main_boosted][bg_vol]amix=inputs=2:duration=first:dropout_transition=3[a_mix]",
+
+                    # Mapping
+                    "-map", "0:v",                          # Map video from Input 0
+                    "-map", "[a_mix]",                      # Map the mixed audio output from the filtergraph
+
+                    # Codec Options (video) - Keep consistent quality
+                    "-c:v", "libx264", "-preset", "medium", "-crf", "22", "-profile:v", "high", "-level:v", "4.1",
+                    # Codec Options (audio - for the *mixed* output)
+                    "-c:a", "aac", "-b:a", "160k", # Slightly higher audio bitrate for mixed audio
+
+                    # Other Options
+                    "-avoid_negative_ts", "make_zero",      # Handle timestamp issues
+                    "-map_metadata", "-1",                  # Remove metadata
+                    "-movflags", "+faststart",              # Optimize for web
+                    short_path                              # Output file path
+                ])
+                logger.info(f"Running ffmpeg (re-encode with boosted main audio + mixed background) for short {short_id}") # Log command below
+                # logger.debug(f"FFmpeg command: {' '.join(ffmpeg_command)}") # Uncomment for detailed debugging
+
+            else:
+                # Original command for just cutting (re-encoding video and original audio) - NO BOOST HERE
+                ffmpeg_command.extend([
+                    "-i", edited_video_path,                # Input file
+                    "-ss", str(start_seconds),              # Start time (Output Seeking)
+                    "-t", str(duration_seconds),            # Duration of the clip
+                    "-map", "0:v",                          # Map video stream
+                    "-map", "0:a?",                         # Map audio stream IF IT EXISTS (?)
+                    # Video codec - Keep consistent quality
+                    "-c:v", "libx264", "-preset", "medium", "-crf", "22", "-profile:v", "high", "-level:v", "4.1",
+                    # Audio codec (re-encode original audio) - Keep consistent
+                    "-c:a", "aac", "-b:a", "160k",
+                    "-avoid_negative_ts", "make_zero",      # Handle potential timestamp issues
+                    "-map_metadata", "-1",                  # Remove metadata
+                    "-movflags", "+faststart",              # Optimize for web
+                    short_path                              # Output file path
+                ])
+                logger.info(f"Running ffmpeg (re-encode, only original audio, no boost) for short {short_id}") # Log command below
+                # logger.debug(f"FFmpeg command: {' '.join(ffmpeg_command)}") # Uncomment for detailed debugging
+
+
+            # Execute FFmpeg
+            # Add explicit error logging for stderr
+            try:
+                # Set encoding explicitly for Windows compatibility if needed
+                process_encoding = 'utf-8' if os.name != 'nt' else 'cp437' # Or try 'cp850' if 437 fails on some systems
+                result = subprocess.run(ffmpeg_command, check=True, capture_output=True, text=True, encoding=process_encoding, errors='replace')
+                logger.debug(f"FFmpeg stdout for short {short_id}: {result.stdout}")
+                logger.debug(f"FFmpeg stderr for short {short_id}: {result.stderr}") # Log stderr even on success for info
+            except subprocess.CalledProcessError as e:
+                 # Log detailed error if check=True fails
+                 logger.error(f"FFmpeg failed for short {short_id} (Return Code: {e.returncode}).")
+                 # Decode stdout/stderr manually if needed, using replacement for bad characters
+                 stderr_decoded = e.stderr.decode(process_encoding, errors='replace') if isinstance(e.stderr, bytes) else str(e.stderr)
+                 stdout_decoded = e.stdout.decode(process_encoding, errors='replace') if isinstance(e.stdout, bytes) else str(e.stdout)
+                 logger.error(f"FFmpeg stdout: {stdout_decoded}")
+                 logger.error(f"FFmpeg stderr: {stderr_decoded}")
+                 raise # Re-raise the exception to trigger failure handling
+            except Exception as e:
+                logger.error(f"Unexpected error executing FFmpeg for short {short_id}: {e}", exc_info=True)
+                raise
 
             # --- Validation ---
-            # (Validation logic remains the same)
-            if not os.path.exists(short_path) or os.path.getsize(short_path) == 0:
-                error_details = result.stderr if result and result.stderr else "Unknown FFmpeg error or no output."
-                raise RuntimeError(f"FFmpeg command finished but output file is missing or empty: {short_path}. FFmpeg stderr: {error_details}")
+            min_expected_size_kb = 10 # Example: Expect at least 10KB
+            final_size = os.path.getsize(short_path) if os.path.exists(short_path) else 0
+            if not os.path.exists(short_path) or final_size < (min_expected_size_kb * 1024):
+                error_details = result.stderr if 'result' in locals() and result and result.stderr else "Unknown FFmpeg error or empty/tiny output."
+                logger.error(f"FFmpeg command finished but output file '{short_path}' is missing or too small ({final_size} bytes).")
+                raise RuntimeError(f"FFmpeg produced invalid output file: {short_path}. FFmpeg stderr: {error_details}")
 
 
             # --- Success ---
             short.short_filename = short_filename
             short.status = 'completed'
             session.commit()
-            logger.info(f"Short {short_id} created successfully: {short_filename}")
+            logger.info(f"Short {short_id} created successfully {'with mixed audio' if add_audio else ''}: {short_filename}")
 
+        # --- Error Handling (remains largely the same) ---
         except FileNotFoundError as e:
              logger.error(f"File not found error creating short {short_id}: {e}", exc_info=True)
              if short: short.status = 'failed'
         except ValueError as e: # Catch invalid duration, status errors etc.
              logger.error(f"Value error creating short {short_id}: {e}", exc_info=True)
              if short: short.status = 'failed'
-        except (subprocess.CalledProcessError, RuntimeError) as e: # Catch ffmpeg errors or file creation errors
-             # Log stderr from the exception if available
-             stderr_output = e.stderr if hasattr(e, 'stderr') else 'N/A'
-             logger.error(f"FFmpeg/Runtime error for short {short_id}. Error: {e}, FFmpeg stderr: {stderr_output}", exc_info=True)
+        except (subprocess.CalledProcessError, RuntimeError) as e:
+             if isinstance(e, RuntimeError):
+                 logger.error(f"Runtime error after FFmpeg execution for short {short_id}: {e}", exc_info=False)
              if short:
                  short.status = 'failed'
-                 short.short_filename = None # Clear filename on failure
-                 # Attempt to delete potentially corrupted output file only if path was defined
+                 short.short_filename = None
                  if 'short_path' in locals() and short_path and os.path.exists(short_path):
                      try:
                          os.remove(short_path)
@@ -794,9 +900,8 @@ def process_short(video_id, short_id):
             logger.error(f"General error creating short {short_id}: {e}", exc_info=True)
             if short:
                  short.status = 'failed'
-                 short.short_filename = None # Ensure filename is cleared
+                 short.short_filename = None
         finally:
-            # Commit status change if an error occurred and short object exists
             if short and short.status == 'failed':
                 try:
                     session.commit()
@@ -804,7 +909,6 @@ def process_short(video_id, short_id):
                     logger.error(f"Failed to commit 'failed' status for short {short_id}: {db_err}")
                     session.rollback()
             session.close() # Close session
-
 
 def time_to_seconds(time_str):
     """Converts HH:MM:SS or H:MM:SS string to seconds."""
@@ -829,8 +933,8 @@ def time_to_seconds(time_str):
 active_tasks = {}
 task_lock = threading.Lock()
 
-def start_task(task_key, target_func, args_tuple):
-    """Starts a background task if not already running."""
+def start_task(task_key, target_func, args_tuple=None, kwargs_dict=None):
+    """Starts a background task if not already running, supports args and kwargs."""
     with task_lock:
         if task_key in active_tasks and active_tasks[task_key].is_alive():
             logger.warning(f"Task {task_key} is already running. Skipping new request.")
@@ -842,12 +946,15 @@ def start_task(task_key, target_func, args_tuple):
             del active_tasks[k]
             logger.debug(f"Cleaned up finished task: {k}")
 
-        logger.info(f"Starting background task: {task_key} for function {target_func.__name__} with args {args_tuple}")
-        thread = threading.Thread(target=target_func, args=args_tuple, name=task_key)
+        # Ensure args_tuple and kwargs_dict are initialized if None
+        args_tuple = args_tuple if args_tuple is not None else ()
+        kwargs_dict = kwargs_dict if kwargs_dict is not None else {}
+
+        logger.info(f"Starting background task: {task_key} for function {target_func.__name__} with args {args_tuple} and kwargs {kwargs_dict}")
+        thread = threading.Thread(target=target_func, args=args_tuple, kwargs=kwargs_dict, name=task_key)
         active_tasks[task_key] = thread
         thread.start()
         return True # Indicate task started
-
 def process_uploaded_video_with_subtitle(video_id, zoom_factor=2.0):
     """Handles initial processing when subtitle WAS provided during upload."""
     logger.info(f"Queuing initial processing (with subs hint) for video {video_id} using zoom {zoom_factor}.")
@@ -1184,36 +1291,40 @@ def get_videos():
          # Provide a slightly more specific error if possible, but avoid leaking too much detail
          return jsonify({"error": "Failed to process video list on server"}), 500
 
-
 @app.route('/videos/<int:video_id>/shorts/<int:short_id>/create', methods=['POST'])
-def create_short_endpoint(video_id, short_id): # Renamed to avoid conflict
+def create_short_endpoint(video_id, short_id):
     session = db.session
     short = session.get(ShortSegment, short_id)
     if not short or short.video_id != video_id:
         session.close()
         return jsonify({'error': 'Short not found or mismatched video ID'}), 404
 
-    # Allow creation only from pending or failed states
     if short.status not in ['pending', 'failed']:
         session.close()
         return jsonify({'error': f'Short status is {short.status}. Cannot start creation.'}), 400
 
-    video = short.video # Get video via relationship
+    video = short.video
     if not video or video.status != 'completed':
          session.close()
          return jsonify({'error': f'Cannot create short, main video status is {video.status} (must be completed).'}), 400
 
-    # Update status to queued immediately
+    # --- Extract audio data from request ---
+    data = request.get_json() or {}
+    audio_filename = data.get('audio_filename')
+    audio_volume = data.get('audio_volume')
+    logger.info(f"Create request for short {short_id}: Audio='{audio_filename}', Volume='{audio_volume}'")
+    # --- End audio data extraction ---
+
     short.status = 'queued'
     session.commit()
 
-    # Start processing in background thread
     task_key = f"short_{short_id}"
-    if start_task(task_key, process_short, (video_id, short_id)):
+    # Pass audio details as keyword arguments to the task
+    task_kwargs = {'audio_filename': audio_filename, 'audio_volume': audio_volume}
+    if start_task(task_key, process_short, args_tuple=(video_id, short_id), kwargs_dict=task_kwargs):
         message = 'Short creation queued'
         status_code = 202
     else:
-         # If task was already running, report that
          message = 'Short creation task already running.'
          status_code = 200
 
@@ -1414,24 +1525,29 @@ def refresh_shorts_endpoint(video_id): # Renamed endpoint function to refresh_sh
 
 
 @app.route('/videos/<int:video_id>/shorts/<int:short_id>/recreate', methods=['POST'])
-def recreate_short_endpoint(video_id, short_id): # Renamed endpoint function
+def recreate_short_endpoint(video_id, short_id):
     session = db.session
     short = session.get(ShortSegment, short_id)
     if not short or short.video_id != video_id:
         session.close()
         return jsonify({'error': 'Short not found or mismatched video ID'}), 404
 
-    # Allow recreation from completed or failed states
     if short.status not in ['completed', 'failed']:
         session.close()
         return jsonify({'error': f'Short status is {short.status}. Use "Create" or wait for completion/failure to recreate.'}), 400
 
-    video = short.video # Get video via relationship
+    video = short.video
     if not video or video.status != 'completed':
          session.close()
          return jsonify({'error': f'Cannot recreate short, main video status is {video.status} (must be completed).'}), 400
 
-    # --- Delete Old File ---
+    # --- Extract audio data from request ---
+    data = request.get_json() or {}
+    audio_filename = data.get('audio_filename')
+    audio_volume = data.get('audio_volume')
+    logger.info(f"Recreate request for short {short_id}: Audio='{audio_filename}', Volume='{audio_volume}'")
+    # --- End audio data extraction ---
+
     if short.short_filename:
         short_path = os.path.join(EDITED_SHORTS_DIR, short.short_filename)
         if os.path.exists(short_path):
@@ -1440,20 +1556,19 @@ def recreate_short_endpoint(video_id, short_id): # Renamed endpoint function
                 logger.info(f"Removed existing file for short {short_id} before recreation: {short_path}")
             except OSError as e:
                  logger.error(f"Could not remove existing file {short_path}: {e}")
-                 # Proceed anyway? Ffmpeg -y should overwrite.
-        short.short_filename = None # Clear filename in DB regardless
+        short.short_filename = None
 
-    # --- Queue Task ---
-    short.status = 'queued' # Use queued status
+    short.status = 'queued'
     session.commit()
 
     logger.info(f"Queueing recreation for short {short_id}")
     task_key = f"short_{short_id}"
-    if start_task(task_key, process_short, (video_id, short_id)):
+    # Pass audio details as keyword arguments to the task
+    task_kwargs = {'audio_filename': audio_filename, 'audio_volume': audio_volume}
+    if start_task(task_key, process_short, args_tuple=(video_id, short_id), kwargs_dict=task_kwargs):
         message = 'Short recreation queued'
         status_code = 202
     else:
-        # Task already running
         message = 'Short recreation task already running.'
         status_code = 200
 
@@ -1504,6 +1619,29 @@ def get_shorts_for_video(video_id): # Renamed endpoint function
         logger.error(f"Error fetching shorts for modal (video {video_id}): {e}", exc_info=True)
         # Provide a slightly more specific error if possible, but avoid leaking too much detail
         return jsonify({"error": "Failed to process shorts list on server"}), 500
+    
+@app.route('/audio-files', methods=['GET'])
+def list_audio_files():
+    """Endpoint to list available audio files."""
+    audio_files = []
+    allowed_extensions = {'.mp3', '.wav', '.aac', '.ogg', '.m4a'} # Add more if needed
+    try:
+        if os.path.exists(MUSIC_DIR):
+            for filename in os.listdir(MUSIC_DIR):
+                if os.path.isfile(os.path.join(MUSIC_DIR, filename)):
+                    _, ext = os.path.splitext(filename)
+                    if ext.lower() in allowed_extensions:
+                        audio_files.append(filename)
+            audio_files.sort() # Sort alphabetically
+        else:
+            logger.warning(f"Audio directory not found: {MUSIC_DIR}")
+            # Optionally return an error, but returning empty list might be better for UI
+            # return jsonify({"error": "Audio directory not configured or found."}), 500
+    except Exception as e:
+        logger.error(f"Error listing audio files in {MUSIC_DIR}: {e}", exc_info=True)
+        return jsonify({"error": "Failed to list audio files."}), 500
+
+    return jsonify(audio_files)
 
 # --- Socket and Run ---
 import socket

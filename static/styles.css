@@ -607,3 +607,64 @@ p.info-message { /* Style simple messages in the shorts list */
     /* .modal-content { max-width: 720px; } */
     /* #shortsModalContent { max-width: 900px; } */
 }
+
+ /* Add styles for the new Audio Selection Modal */
+ .modal#audioSelectionModal .modal-content {
+    max-width: 500px; /* Adjust width as needed */
+}
+
+.modal#audioSelectionModal label {
+    display: block;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.modal#audioSelectionModal select,
+.modal#audioSelectionModal input[type="range"] {
+    width: 95%; /* Make controls take most of the width */
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid var(--input-border-color);
+    background-color: var(--input-bg-color);
+    color: var(--text-color);
+    border-radius: 4px;
+}
+
+.modal#audioSelectionModal #audioVolumeContainer {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color); /* Separator */
+}
+
+.modal#audioSelectionModal #volumeValue {
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.modal#audioSelectionModal .modal-actions {
+    margin-top: 20px;
+    text-align: right;
+}
+
+.modal#audioSelectionModal .modal-actions button {
+    padding: 10px 20px;
+    margin-left: 10px;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+}
+.modal#audioSelectionModal .modal-actions .confirm-button {
+     background-color: var(--button-bg-color);
+     color: var(--button-text-color);
+}
+.modal#audioSelectionModal .modal-actions .confirm-button:hover {
+     background-color: var(--button-hover-bg-color);
+}
+.modal#audioSelectionModal .modal-actions .cancel-button {
+     background-color: var(--secondary-button-bg-color);
+     color: var(--secondary-button-text-color);
+}
+ .modal#audioSelectionModal .modal-actions .cancel-button:hover {
+     background-color: var(--secondary-button-hover-bg-color);
+ }
