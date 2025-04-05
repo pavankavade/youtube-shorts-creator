@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  web:
+    build: . # Build the image using the Dockerfile in the current directory
+    container_name: video-shorts-generator # Optional: Give the container a specific name
+    ports:
+      - "5000:5000" # Map port 5000 on your host to port 5000 in the container
+    volumes:
+      # Mount the local ./data directory to /app/data inside the container
+      # This persists videos, subtitles, audio, music, edited files, and the SQLite DB
+      - ./data:/app/data
+      # Optional: Mount a named volume for the Hugging Face cache (faster_whisper models)
+      # This avoids re-downloading models every time the container is recreated
+      - huggingface_cache:/root/.cache/huggingface
+    environment:
+      # Pass the Gemini API Key from the host environment or .env file
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # Add any other necessary environment variables here
+      # - FLASK_DEBUG=${FLASK_DEBUG:-0} # Example: Use FLASK_DEBUG from .env, default to 0 if not set
+    env_file:
+      - .env # Load variables from the .env file
+    # Optional: Restart policy
+    # restart: unless-stopped
+
+# Define the named volume for the cache (if used)
+volumes:
+  huggingface_cache:

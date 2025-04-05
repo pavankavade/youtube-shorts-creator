@@ -1,0 +1,20 @@
+# Flask and related
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+Werkzeug
+
+# Video/Audio Processing
+moviepy==1.0.3 # Pin to an older version
+
+faster_whisper
+pysrt
+webvtt-py
+Pillow
+
+# API Client
+google-generativeai
+
+# Other utilities (implicitly needed or good practice)
+python-dotenv # To load .env file if needed, though Docker Compose handles it
+requests      # Good general purpose library, might be needed by dependencies

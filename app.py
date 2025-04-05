@@ -29,7 +29,9 @@ from flask_migrate import Migrate
 import time # Import time for delays
 
 app = Flask(__name__, static_url_path='', static_folder='static')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///shorts.db'
+CONTAINER_DATA_DIR = '/app/data'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{CONTAINER_DATA_DIR}/shorts.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Increase timeout for longer operations if needed
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_timeout': 30, 'pool_recycle': 280}
@@ -38,13 +40,15 @@ db = SQLAlchemy(app) # Use default SQLAlchemy initialization
 migrate = Migrate(app, db)
 
 # --- Directories (Ensure SUBTITLES_DIR is included) ---
-DATA_DIR = os.path.abspath("data")
+# Use the path *inside* the container for operations within the app
+DATA_DIR = os.path.abspath("/app/data") #<-- CHANGE THIS LINE
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 EDITED_VIDEOS_DIR = os.path.join(DATA_DIR, "edited-videos")
 EDITED_SHORTS_DIR = os.path.join(DATA_DIR, "edited-shorts")
 AUDIO_DIR = os.path.join(DATA_DIR, "audio")
-MUSIC_DIR = os.path.join(DATA_DIR, "music") 
+MUSIC_DIR = os.path.join(DATA_DIR, "music")
 SUBTITLES_DIR = os.path.join(DATA_DIR, "subtitles") # Make sure this is defined
+# The os.makedirs calls will now create directories inside /app/data within the container
 for dir_path in [DATA_DIR, VIDEOS_DIR, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR, AUDIO_DIR, SUBTITLES_DIR, MUSIC_DIR]:
     os.makedirs(dir_path, exist_ok=True)
 # --- End Directories ---

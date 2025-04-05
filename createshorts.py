@@ -9,26 +9,14 @@ import math  # For ceiling function
 import logging # For logging
 import webvtt # Import webvtt
 from datetime import timedelta # Import timedelta for VTT parsing
+logger = logging.getLogger(__name__) # Use logger
 
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
 # Configure ImageMagick (Update path if necessary)
-try:
-    # Example for Windows, adjust if needed for other OS
-    imagemagick_path = r"C:\Program Files\ImageMagick-7.1.1-Q16-HDRI\magick.exe"
-    if os.path.exists(imagemagick_path):
-        change_settings({"IMAGEMAGICK_BINARY": imagemagick_path})
-    else:
-        # Try common Linux/macOS paths or rely on system PATH
-        if os.path.exists("/usr/bin/magick"):
-            change_settings({"IMAGEMAGICK_BINARY": "/usr/bin/magick"})
-        elif os.path.exists("/usr/local/bin/magick"):
-            change_settings({"IMAGEMAGICK_BINARY": "/usr/local/bin/magick"})
-        else:
-            print("Warning: ImageMagick binary not found at expected paths. Text rendering might use default.")
-except Exception as e:
-    print(f"Warning: Could not set ImageMagick path. Text rendering might be affected. Error: {e}")
+# Configure ImageMagick (MoviePy should find it in the container's PATH)
+
 
 # Directories (ensure consistency with app.py)
 DATA_DIR = os.path.abspath("data")

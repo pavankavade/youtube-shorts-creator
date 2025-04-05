@@ -1,0 +1,26 @@
+# Git files
+.git/
+.gitignore
+
+# Python virtual environment
+venv/
+*.pyc
+__pycache__/
+
+# Docker specific files
+Dockerfile
+docker-compose.yml
+.dockerignore
+.env
+
+# Data files (mount as volume instead)
+data/
+shorts.db* # Ignore database file and potential journal files
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDE folders
+.vscode/
+.idea/
