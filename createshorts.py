@@ -9,6 +9,7 @@ import math  # For ceiling function
 import logging # For logging
 import webvtt # Import webvtt
 from datetime import timedelta # Import timedelta for VTT parsing
+import re # Add re import
 
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
@@ -178,6 +179,8 @@ def parse_srt(filepath):
                  continue
             # Clean and reformat text
             cleaned_text = sub.text.replace('\r', '').strip() # Remove CR, keep LF for potential structure, strip ends
+            # Remove HTML-like tags
+            cleaned_text = re.sub(r"<[^>]*>", "", cleaned_text)
             # If SRT contains specific line breaks, reformat_subtitle_text might override them.
             # Consider if preserving SRT line breaks is desired. For now, reformat based on word count.
             formatted_text = reformat_subtitle_text(cleaned_text.replace('\n', ' '), max_words=words_per_line) # Replace internal newlines before reformatting
@@ -186,7 +189,7 @@ def parse_srt(filepath):
                     "start": start_time,
                     "end": end_time,
                     "text": formatted_text,
-                    "raw_text": cleaned_text.replace('\n', ' ') # Store the cleaned, single-line text
+                    "raw_text": cleaned_text.replace('\n', ' ') # Store the cleaned, single-line text (now without tags)
                 })
         except Exception as e:
             logger.error(f"Error processing SRT entry index {sub.index}: {e}. Text: '{sub.text[:50]}...'", exc_info=True)
