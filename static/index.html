@@ -61,6 +61,12 @@
                 value="2.0"
               />
             </div>
+            <div>
+              <label>
+                <input type="checkbox" id="processWithoutSubs" name="process_without_subs" />
+                Process without subtitles
+              </label>
+            </div>
             <button type="submit">Upload & Process</button>
           </form>
           <div id="uploadStatus" class="status"></div>
@@ -105,6 +111,19 @@
         </button>
         <h3 id="shortsModalTitle">Shorts</h3>
         <div id="shortsModalStatus" class="status"></div>
+        <!-- Manual Short Creation Form -->
+        <div id="manualShortFormContainer" class="manual-short-form">
+          <h4>Add Manual Short</h4>
+          <form id="manualShortForm" onsubmit="submitManualShort(event)">
+            <input type="text" id="manualShortName" placeholder="Short Name" required maxlength="100" />
+            <input type="text" id="manualShortDesc" placeholder="Short Description" required maxlength="200" />
+            <input type="text" id="manualShortStart" placeholder="Start Time (H:MM:SS)" required pattern="^\d{1,3}:\d{2}:\d{2}$" value="0:00:00" />
+            <input type="text" id="manualShortEnd" placeholder="End Time (H:MM:SS)" required pattern="^\d{1,3}:\d{2}:\d{2}$" value="0:01:00" />
+            <button type="submit">Add Short</button>
+          </form>
+          <div id="manualShortFormStatus" class="status"></div>
+        </div>
+        <!-- End Manual Short Creation Form -->
         <!-- This div will scroll -->
         <div id="shortsList">
           <!-- Short items will be inserted here -->
@@ -722,6 +741,11 @@
           if (!isNaN(zoomValue) && zoomValue >= 1) {
             formData.append("zoom_factor", zoomValue);
           } // Backend will use default if not provided or invalid
+
+          const processWithoutSubs = document.getElementById("processWithoutSubs").checked;
+          if (processWithoutSubs) {
+            formData.append("process_without_subs", "true");
+          }
 
           let statusMsg = "Uploading video...";
 
@@ -1797,6 +1821,59 @@
           }
         }
       });
+
+      // --- NEW: Submit Manual Short ---
+      async function submitManualShort(e) {
+        e.preventDefault();
+        const videoId = currentModalVideoId;
+        const name = document.getElementById("manualShortName").value.trim();
+        const desc = document.getElementById("manualShortDesc").value.trim();
+        const start = document.getElementById("manualShortStart").value.trim();
+        const end = document.getElementById("manualShortEnd").value.trim();
+        const statusDiv = document.getElementById("manualShortFormStatus");
+        statusDiv.textContent = "";
+
+        // Strict H:MM:SS pattern check
+        const timePattern = /^\d{1,3}:\d{2}:\d{2}$/;
+        if (!timePattern.test(start) || !timePattern.test(end)) {
+          statusDiv.textContent =
+            "Start and End time must be in H:MM:SS format (e.g., 0:01:00)";
+          statusDiv.className = "status status-failed";
+          return;
+        }
+
+        if (!name || !desc || !start || !end) {
+          statusDiv.textContent = "All fields are required.";
+          statusDiv.className = "status status-failed";
+          return;
+        }
+
+        try {
+          const response = await fetch(`/videos/${videoId}/shorts/manual_create`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              short_name: name,
+              short_description: desc,
+              start_time: start,
+              end_time: end,
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Failed to create short.");
+          statusDiv.textContent = "Short created!";
+          statusDiv.className = "status status-completed";
+          e.target.reset();
+          // Refresh shorts list
+          const shorts = await fetchShortsForVideo(videoId);
+          videosData[videoId].shorts = shorts;
+          updateShortsModal(videoId);
+        } catch (err) {
+          statusDiv.textContent = err.message;
+          statusDiv.className = "status status-failed";
+        }
+      }
+      // --- END NEW ---
     </script>
   </body>
 </html>

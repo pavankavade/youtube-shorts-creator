@@ -332,7 +332,7 @@ def parse_segments(response_text):
         return []
 
 # --- Core Processing Logic ---
-def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=False, zoom_factor=2.0):
+def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=False, zoom_factor=2.0, process_without_subs=False):
     """Core logic for processing/reprocessing a video. Should run in a separate thread."""
     # Validate zoom factor early, default if needed
     try:
@@ -359,7 +359,7 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
 
             video.status = 'processing'
             session.commit()
-            logger.info(f"Starting processing for video {video_id}. Force: {force_reprocess}, Use Subs Hint: {use_uploaded_subtitle}, Zoom: {zoom_factor}")
+            logger.info(f"Starting processing for video {video_id}. Force: {force_reprocess}, Use Subs Hint: {use_uploaded_subtitle}, Zoom: {zoom_factor}, Process Without Subs: {process_without_subs}")
 
             original_video_path = os.path.join(VIDEOS_DIR, video.original_filename)
             if not os.path.exists(original_video_path):
@@ -408,7 +408,7 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
                      logger.info("Attempting transcript generation only (skip_editing=True).")
                      try:
                         _, whisper_transcript_result, parsed_subtitle_groups = process_video(
-                            original_video_path, edited_filename, skip_editing=True, subtitle_file_path=None, zoom_factor=zoom_factor # Pass zoom even if skipping
+                            original_video_path, edited_filename, skip_editing=True, subtitle_file_path=None, zoom_factor=zoom_factor, process_without_subs=process_without_subs # Pass zoom even if skipping
                         )
                         if whisper_transcript_result:
                              logger.info(f"Transcript generation completed (skip_editing=True).")
@@ -435,7 +435,7 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
                       video.edited_filename = edited_filename
 
             else: # Needs editing (or re-editing)
-                 logger.info(f"Running full video processing (editing). Subtitle source hint: {subtitle_source}, Zoom: {zoom_factor}")
+                 logger.info(f"Running full video processing (editing). Subtitle source hint: {subtitle_source}, Zoom: {zoom_factor}, Process Without Subs: {process_without_subs}")
                  try:
                      # Call process_video to edit and get transcript data
                      edited_video_path_result, whisper_transcript_result, parsed_subtitle_groups = process_video(
@@ -443,7 +443,8 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
                          edited_filename,
                          skip_editing=False, # We are editing now
                          subtitle_file_path=subtitle_file_path, # Pass the path if determined
-                         zoom_factor=zoom_factor # Pass the zoom factor
+                         zoom_factor=zoom_factor, # Pass the zoom factor
+                         process_without_subs=process_without_subs # Pass process_without_subs flag
                      )
                      # Update DB with the actual filename produced
                      video.edited_filename = os.path.basename(edited_video_path_result)
@@ -573,15 +574,15 @@ def _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=F
             session.close()
 
 
-def process_uploaded_video(video_id, zoom_factor=2.0):
+def process_uploaded_video(video_id, zoom_factor=2.0, process_without_subs=False):
     """Handles the initial processing after video upload (detects subs)."""
-    logger.info(f"Queuing initial processing for video {video_id} with zoom {zoom_factor}.")
-    _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=False, zoom_factor=zoom_factor) # use_uploaded_subtitle=False lets core decide
+    logger.info(f"Queuing initial processing for video {video_id} with zoom {zoom_factor}. process_without_subs={process_without_subs}")
+    _process_video_core(video_id, force_reprocess=False, use_uploaded_subtitle=False, zoom_factor=zoom_factor, process_without_subs=process_without_subs)
 
 def reprocess_video_with_subtitle(video_id, zoom_factor=2.0):
     """Forces reprocessing, specifically *using* the uploaded subtitle file."""
     logger.info(f"Queuing reprocessing *with* subtitles for video {video_id} using zoom {zoom_factor}.")
-    _process_video_core(video_id, force_reprocess=True, use_uploaded_subtitle=True, zoom_factor=zoom_factor) # force_reprocess=True, use_uploaded_subtitle=True
+    _process_video_core(video_id, force_reprocess=True, use_uploaded_subtitle=True, zoom_factor=zoom_factor)
 
 # --- New Background Task Function ---
 def trigger_full_reprocessing(video_id, zoom_factor=2.0):
@@ -613,8 +614,36 @@ def regenerate_suggestions(video_id):
             # --- Get Text Content ---
             text_for_gemini = get_subtitle_text_content(video)
 
-            if not text_for_gemini:
-                logger.warning(f"No valid subtitle content found for video {video_id} to regenerate suggestions.")
+            # If no valid transcript, try to generate with Whisper (skip_editing)
+            if not text_for_gemini or not isinstance(text_for_gemini, str) or text_for_gemini.strip() == "" or text_for_gemini.startswith("Transcription data") or text_for_gemini.startswith("Using uploaded") or text_for_gemini.startswith("Subtitle processing failed"):
+                logger.info(f"No valid subtitle content found for video {video_id}. Attempting Whisper transcript generation for suggestions only.")
+                try:
+                    from createshorts import process_video
+                    original_video_path = os.path.join(VIDEOS_DIR, video.original_filename)
+                    edited_filename = f"{os.path.splitext(video.original_filename)[0]}_edited.mp4"
+                    _, whisper_transcript_result, _ = process_video(
+                        original_video_path,
+                        edited_filename,
+                        skip_editing=True,
+                        subtitle_file_path=None,
+                        zoom_factor=2.0,
+                        process_without_subs=True
+                    )
+                    if whisper_transcript_result:
+                        formatted_transcript = format_transcript(whisper_transcript_result)
+                        video.transcript = formatted_transcript
+                        session.commit()
+                        text_for_gemini = formatted_transcript
+                    else:
+                        logger.warning(f"Whisper transcript generation failed for video {video_id}. Cannot suggest shorts.")
+                        return
+                except Exception as e:
+                    logger.error(f"Whisper transcript generation failed for video {video_id}: {e}")
+                    return
+
+            # --- Check again for valid transcript ---
+            if not text_for_gemini or not isinstance(text_for_gemini, str) or text_for_gemini.strip() == "" or text_for_gemini.startswith("Transcription data") or text_for_gemini.startswith("Using uploaded") or text_for_gemini.startswith("Subtitle processing failed"):
+                logger.warning(f"No valid subtitle content found for video {video_id} to regenerate suggestions. Skipping Gemini call.")
                 return
 
             # --- Get New Segments ---
@@ -971,6 +1000,7 @@ def upload_video_endpoint(): # Renamed endpoint function
     video_file = request.files['video']
     subtitle_file = request.files.get('subtitle') # Use .get for optional file
     zoom_factor_str = request.form.get('zoom_factor', default='2.0') # Get zoom factor as string
+    process_without_subs = request.form.get('process_without_subs', 'false').lower() == 'true'
 
     # Try converting zoom factor, use default on failure
     try:
@@ -1038,7 +1068,7 @@ def upload_video_endpoint(): # Renamed endpoint function
         logger.info(f"Video record ready with ID {video_id}")
 
         # --- 3. Handle Optional Subtitle File ---
-        if subtitle_file and subtitle_file.filename != '':
+        if not process_without_subs and subtitle_file and subtitle_file.filename != '':
             allowed_extensions = {'.srt', '.vtt'}
             sub_filename = secure_filename(subtitle_file.filename)
             sub_ext = os.path.splitext(sub_filename)[1].lower()
@@ -1067,7 +1097,10 @@ def upload_video_endpoint(): # Renamed endpoint function
         # --- 4. Start Background Processing ---
         task_key = f"video_{video_id}"
         # Pass the validated or default zoom factor to the task
-        start_task(task_key, start_processing_func, (video_id, zoom_factor))
+        if process_without_subs:
+            start_task(task_key, process_uploaded_video, (video_id, zoom_factor), {'process_without_subs': True})
+        else:
+            start_task(task_key, start_processing_func, (video_id, zoom_factor))
 
         return jsonify({
             'video_id': video_id,
@@ -1487,7 +1520,7 @@ def update_short(video_id, short_id):
 
 # Endpoint for "Reprocess Suggestions" button
 @app.route('/videos/<int:video_id>/refresh', methods=['POST'])
-def refresh_shorts_endpoint(video_id): # Renamed endpoint function to refresh_shorts_endpoint
+def refresh_shorts_endpoint(video_id):
     session = db.session
     video = session.get(Video, video_id)
     if not video:
@@ -1502,23 +1535,40 @@ def refresh_shorts_endpoint(video_id): # Renamed endpoint function to refresh_sh
     # Check if there's any content to base suggestions on
     has_content = get_subtitle_text_content(video) is not None # Use helper to check
     if not has_content:
-         session.close()
-         return jsonify({'error': 'No valid subtitle content (uploaded or generated) available for this video to generate suggestions.'}), 400
-
+        # Try to generate transcript with Whisper for suggestions only (no video editing)
+        try:
+            from createshorts import process_video
+            original_video_path = os.path.join(VIDEOS_DIR, video.original_filename)
+            edited_filename = f"{os.path.splitext(video.original_filename)[0]}_edited.mp4"
+            # Only generate transcript, do not edit video
+            _, whisper_transcript_result, _ = process_video(
+                original_video_path,
+                edited_filename,
+                skip_editing=True,
+                subtitle_file_path=None,
+                zoom_factor=2.0,
+                process_without_subs=True
+            )
+            if whisper_transcript_result:
+                formatted_transcript = format_transcript(whisper_transcript_result)
+                video.transcript = formatted_transcript
+                session.commit()
+                has_content = True
+            else:
+                session.close()
+                return jsonify({'error': 'Failed to generate transcript for suggestions.'}), 400
+        except Exception as e:
+            session.close()
+            return jsonify({'error': f'Failed to generate transcript for suggestions: {e}'}), 500
 
     logger.info(f"Queueing suggestion regeneration for video {video_id}")
-    # Use a unique task key for suggestion regeneration to allow it potentially
-    # alongside other non-conflicting tasks, though using video_id key is safer
-    # task_key = f"suggest_{video_id}"
-    task_key = f"video_{video_id}" # Safer: Prevent overlap with full processing
-
+    task_key = f"video_{video_id}"
     if start_task(task_key, regenerate_suggestions, (video_id,)):
-        # Let the thread handle status updates
         message = 'Suggestion regeneration queued. Non-completed suggestions will be replaced shortly.'
         status_code = 202
     else:
         message = 'Suggestion regeneration task is already running or queued.'
-        status_code = 200 # Or 409 Conflict?
+        status_code = 200
 
     session.close()
     return jsonify({'message': message}), status_code
@@ -1574,6 +1624,50 @@ def recreate_short_endpoint(video_id, short_id):
 
     session.close()
     return jsonify({'message': message}), status_code
+
+
+@app.route('/videos/<int:video_id>/shorts/manual_create', methods=['POST'])
+def manual_create_short(video_id):
+    session = db.session
+    video = session.get(Video, video_id)
+    if not video:
+        return jsonify({'error': 'Video not found.'}), 404
+
+    data = request.get_json()
+    required_fields = ['short_name', 'short_description', 'start_time', 'end_time']
+    if not all(field in data and data[field] for field in required_fields):
+        return jsonify({'error': 'All fields are required.'}), 400
+
+    # Optionally: Validate time format (H:MM:SS)
+    time_pattern = re.compile(r'^\d{1,3}:\d{2}:\d{2}$')
+    if not time_pattern.match(data['start_time']) or not time_pattern.match(data['end_time']):
+        return jsonify({'error': 'Time format must be H:MM:SS or HH:MM:SS.'}), 400
+
+    # Ensure start < end
+    def time_to_seconds(time_str):
+        h, m, s = map(int, time_str.split(':'))
+        return h * 3600 + m * 60 + s
+    if time_to_seconds(data['start_time']) >= time_to_seconds(data['end_time']):
+        return jsonify({'error': 'Start time must be before end time.'}), 400
+
+    short = ShortSegment(
+        video_id=video_id,
+        short_name=data['short_name'],
+        short_description=data['short_description'],
+        start_time=data['start_time'],
+        end_time=data['end_time'],
+        status='pending'
+    )
+    session.add(short)
+    session.commit()
+    return jsonify({'message': 'Short created successfully.', 'short': {
+        'id': short.id,
+        'short_name': short.short_name,
+        'short_description': short.short_description,
+        'start_time': short.start_time,
+        'end_time': short.end_time,
+        'status': short.status
+    }}), 200
 
 
 # --- Serving files and index ---

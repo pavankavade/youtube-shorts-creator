@@ -267,7 +267,7 @@ def get_text_from_segments(segments):
 
 
 # --- Modified process_video ---
-def process_video(video_path, edited_filename, skip_editing=False, subtitle_file_path=None, zoom_factor=2.0):
+def process_video(video_path, edited_filename, skip_editing=False, subtitle_file_path=None, zoom_factor=2.0, process_without_subs=False):
     """
     Processes video: transcodes, optionally adds subtitles (generated or from file).
 
@@ -277,6 +277,7 @@ def process_video(video_path, edited_filename, skip_editing=False, subtitle_file
         skip_editing (bool): If True, only performs transcription/parsing, no video editing.
         subtitle_file_path (str, optional): Path to an SRT or VTT subtitle file to use instead of generating.
         zoom_factor (float, optional): The factor by which to zoom into the video (e.g., 1.5, 2.0). Defaults to 2.0.
+        process_without_subs (bool, optional): If True, skips embedding subtitles into the video, but transcript and subtitle_groups are still generated.
 
     Returns:
         tuple: (output_file_path, transcript_data, subtitle_groups_data)
@@ -299,6 +300,7 @@ def process_video(video_path, edited_filename, skip_editing=False, subtitle_file
 
     # 1. Determine Subtitle Source and Get Transcript/Subtitle Data
     processed_subtitle_file = False # Flag to track if we used an external file
+    # --- Always generate transcript/subtitles unless using uploaded subtitle file ---
     if subtitle_file_path and os.path.exists(subtitle_file_path):
         logger.info(f"Using provided subtitle file: {subtitle_file_path}")
         file_ext = os.path.splitext(subtitle_file_path)[1].lower()
@@ -313,25 +315,23 @@ def process_video(video_path, edited_filename, skip_editing=False, subtitle_file
             # Fall through to transcription
 
         if processed_subtitle_file:
-             transcript_data = None # No Whisper transcript generated
-             if not subtitle_groups:
-                 logger.warning(f"Parsing subtitle file {subtitle_file_path} resulted in empty data. Video will have no subtitles.")
-        # If file wasn't found or wasn't a valid type, processed_subtitle_file is False, so we proceed to next block
+            transcript_data = None # No Whisper transcript generated
+            if not subtitle_groups:
+                logger.warning(f"Parsing subtitle file {subtitle_file_path} resulted in empty data. Video will have no subtitles.")
+    # If file wasn't found or wasn't a valid type, processed_subtitle_file is False, so we proceed to next block
 
     # Only run transcription if no valid subtitle file path was successfully processed
     if not processed_subtitle_file:
         logger.info("Attempting to generate transcript using Whisper.")
         try:
-            # We might need transcript even if skip_editing is True (e.g., for Gemini suggestions later)
             transcript_data = transcribe_audio(video_path, video_filename_base)
-            # Group words for burning subtitles or for text extraction
             subtitle_groups = group_words_with_timestamps(transcript_data)
             if not subtitle_groups:
-                 logger.warning("Whisper transcription resulted in empty subtitle groups.")
+                logger.warning("Whisper transcription resulted in empty subtitle groups.")
         except Exception as e:
-             logger.error(f"Transcription failed: {e}", exc_info=True)
-             transcript_data = None # Ensure transcript is None on failure
-             subtitle_groups = [] # Ensure no subtitles are attempted
+            logger.error(f"Transcription failed: {e}", exc_info=True)
+            transcript_data = None # Ensure transcript is None on failure
+            subtitle_groups = [] # Ensure no subtitles are attempted
 
     # 2. Handle skip_editing case
     if skip_editing:
@@ -349,7 +349,7 @@ def process_video(video_path, edited_filename, skip_editing=False, subtitle_file
         if not video.duration or video.duration <= 0:
             raise ValueError(f"Video file {video_path} has invalid duration: {video.duration}")
         if not video.size or video.size[0] <= 0 or video.size[1] <= 0:
-             raise ValueError(f"Video file {video_path} has invalid dimensions: {video.size}")
+            raise ValueError(f"Video file {video_path} has invalid dimensions: {video.size}")
 
         # --- Cropping/Resizing Logic ---
         w, h = video.size
@@ -357,127 +357,97 @@ def process_video(video_path, edited_filename, skip_editing=False, subtitle_file
 
         # Calculate scaling factor using MIN to fit, then zoom
         scaling_factor = min(target_width / w, target_height / h) * zoom_factor # <-- USES zoom_factor variable
-        # Use int casting as per the old code reference
         new_w, new_h = int(w * scaling_factor), int(h * scaling_factor)
 
-        # Ensure new dimensions are valid
         if new_w <= 0 or new_h <= 0:
-            # Log a warning or raise error - using current error handling style
             raise ValueError(f"Calculated invalid resize dimensions ({new_w}x{new_h})")
 
         video_resized = video.resize((new_w, new_h))
-
-        # Create a black background clip with the target size
-        background = ColorClip(size=(target_width, target_height), color=(0, 0, 0)).set_duration(video.duration) # <-- Creates background
+        background = ColorClip(size=(target_width, target_height), color=(0, 0, 0)).set_duration(video.duration)
 
         # --- Subtitle Creation ---
         subtitle_clips = []
-        if subtitle_groups:
+        # Only add subtitle clips if process_without_subs is False
+        if not process_without_subs and subtitle_groups:
             logger.info(f"Creating {len(subtitle_groups)} TextClips for subtitles.")
             for i, group in enumerate(subtitle_groups):
-                # Ensure start/end are floats and duration is positive
                 try:
                     start = float(group["start"])
                     end = float(group["end"])
                     duration = end - start
                 except (ValueError, TypeError, KeyError) as e:
-                     logger.warning(f"Skipping subtitle group {i} due to invalid time data: {group}. Error: {e}")
-                     continue
-
+                    logger.warning(f"Skipping subtitle group {i} due to invalid time data: {group}. Error: {e}")
+                    continue
                 if duration <= 0:
                     logger.warning(f"Skipping subtitle group {i} due to zero or negative duration ({duration}): {group}")
                     continue
-                # Use 'text' field which is formatted for embedding
                 if "text" not in group or not group["text"]:
                     logger.warning(f"Skipping subtitle group {i} due to missing or empty formatted text: {group}")
                     continue
-
                 try:
-                    # Ensure text is a string before passing to TextClip
-                    text_content_for_clip = str(group["text"]) # Already formatted by parser/grouper
-
-                    if not text_content_for_clip: # Skip if formatting results in empty string
-                         logger.warning(f"Skipping subtitle group {i} as formatted text is empty.")
-                         continue
-
-                    # Use target_width for caption sizing, similar to old code's (target_width - 40)
+                    text_content_for_clip = str(group["text"])
+                    if not text_content_for_clip:
+                        logger.warning(f"Skipping subtitle group {i} as formatted text is empty.")
+                        continue
                     tc = TextClip(
-                        text_content_for_clip, # Use pre-formatted text
-                        font=subtitle_font, # Ensure font is valid/available on the system
+                        text_content_for_clip,
+                        font=subtitle_font,
                         fontsize=subtitle_fontsize,
                         color=subtitle_color,
                         stroke_color=subtitle_stroke_color,
                         stroke_width=subtitle_stroke_width,
                         align='center',
                         method='caption',
-                        size=(target_width * 0.9, None), # Adjusted from (target_width - 40)
-                        kerning=-0.5 # Optional adjustment
+                        size=(target_width * 0.9, None),
+                        kerning=-0.5
                     ).set_start(start).set_duration(duration)
-
-                    # Position calculation (remains similar, based on target_height)
                     text_w, text_h = tc.size
                     pos_y = max(0, min(target_height - text_h, target_height - text_h - subtitle_vertical_offset))
-
                     tc = tc.set_position(('center', pos_y))
                     subtitle_clips.append(tc)
                 except Exception as e:
-                     # Log error creating specific TextClip, but continue with others
-                     logger.error(f"Error creating TextClip for group {i}: {group}. Error: {e}", exc_info=True)
-
+                    logger.error(f"Error creating TextClip for group {i}: {group}. Error: {e}", exc_info=True)
 
         # --- Composite and Write Video ---
-        # Composite the background, the centered resized video, and subtitles
         final_clip = CompositeVideoClip(
-            [background, video_resized.set_position(((target_width - new_w) / 2, (target_height - new_h) / 2))] + subtitle_clips, # <-- Uses background and positions video_resized
+            [background, video_resized.set_position(((target_width - new_w) / 2, (target_height - new_h) / 2))] + subtitle_clips,
             size=(target_width, target_height)
         )
-        # Ensure final duration matches original video (important as background sets duration)
         final_clip = final_clip.set_duration(video.duration)
-
-        fps = video.fps if video.fps and video.fps > 0 else 30 # Ensure valid FPS
-        keyframe_interval = int(fps * 2) # Keyframe every 2 seconds (adjust as needed)
-
+        fps = video.fps if video.fps and video.fps > 0 else 30
+        keyframe_interval = int(fps * 2)
         logger.info(f"Writing final video to: {output_file}")
         temp_audio_path = os.path.join(AUDIO_DIR, f"{video_filename_base}_temp_audio.aac")
-
-        # ***** MODIFIED CALL *****
         final_clip.write_videofile(
             output_file,
             codec="libx264",
             audio_codec="aac",
             temp_audiofile=temp_audio_path,
             remove_temp=True,
-            threads=os.cpu_count() or 4, # Use available cores or default
+            threads=os.cpu_count() or 4,
             fps=fps,
-            preset='medium', # Balance speed and quality
-            bitrate="5000k", # Adjust bitrate based on quality needs
+            preset='medium',
+            bitrate="5000k",
             ffmpeg_params=[
-                "-g", str(keyframe_interval), # Keyframe interval
-                "-pix_fmt", "yuv420p",      # Pixel format for compatibility
-                "-profile:v", "high",       # H.264 profile
-                "-level:v", "4.1",          # H.264 level
-                "-movflags", "+faststart",   # Optimize for web streaming
+                "-g", str(keyframe_interval),
+                "-pix_fmt", "yuv420p",
+                "-profile:v", "high",
+                "-level:v", "4.1",
+                "-movflags", "+faststart",
             ],
-            logger='bar', # <-- ADDED THIS LINE FOR PROGRESS
-            # verbose=False # Keep verbose False unless debugging ffmpeg directly
+            logger='bar',
         )
-        # ***** END OF MODIFICATION *****
-
         logger.info(f"Successfully wrote video file: {output_file}")
 
     except Exception as e:
-         logger.error(f"MoviePy processing failed for {video_path}: {e}", exc_info=True)
-         # Attempt to clean up potentially incomplete file
-         if os.path.exists(output_file):
-             try: os.remove(output_file)
-             except OSError: logger.warning(f"Could not delete potentially incomplete output file: {output_file}")
-         # Re-raise the exception to signal failure upstream
-         raise
+        logger.error(f"MoviePy processing failed for {video_path}: {e}", exc_info=True)
+        if os.path.exists(output_file):
+            try: os.remove(output_file)
+            except OSError: logger.warning(f"Could not delete potentially incomplete output file: {output_file}")
+        raise
 
     finally:
-        # --- Cleanup ---
         try:
-            # Close clips if they were successfully created
             if 'final_clip' in locals() and final_clip: final_clip.close()
             if 'video_resized' in locals() and video_resized: video_resized.close()
             if video: video.close()
