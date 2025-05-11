@@ -1670,6 +1670,70 @@ def manual_create_short(video_id):
     }}), 200
 
 
+@app.route('/videos/<int:video_id>/shorts/bulk_manual_create', methods=['POST'])
+def bulk_manual_create_shorts(video_id):
+    """
+    Accepts a JSON file upload containing an array of shorts and creates them for the given video.
+    Each item must have: shortname, shortdescription, starttime, endtime
+    """
+    video = Video.query.get(video_id)
+    if not video:
+        return jsonify({"error": "Video not found"}), 404
+
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in request"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    if not file.filename.lower().endswith('.json'):
+        return jsonify({"error": "File must be a .json file"}), 400
+
+    import json
+    try:
+        shorts_data = json.load(file)
+    except Exception as e:
+        return jsonify({"error": f"Invalid JSON: {str(e)}"}), 400
+
+    if not isinstance(shorts_data, list):
+        return jsonify({"error": "JSON must be an array of shorts objects"}), 400
+
+    created = []
+    errors = []
+    for idx, item in enumerate(shorts_data):
+        # Validate required fields
+        for field in ["shortname", "shortdescription", "starttime", "endtime"]:
+            if field not in item:
+                errors.append(f"Item {idx+1}: Missing field '{field}'")
+                break
+        else:
+            # All fields present, create the ShortSegment
+            short = ShortSegment(
+                video_id=video_id,
+                short_name=item["shortname"],
+                short_description=item["shortdescription"],
+                start_time=item["starttime"],
+                end_time=item["endtime"],
+                status="pending"
+            )
+            db.session.add(short)
+            created.append(short)
+    if created:
+        db.session.commit()
+    return jsonify({
+        "created": len(created),
+        "errors": errors,
+        "shorts": [
+            {
+                "id": s.id,
+                "shortname": s.short_name,
+                "shortdescription": s.short_description,
+                "starttime": s.start_time,
+                "endtime": s.end_time
+            } for s in created
+        ]
+    }), 200 if created else 400
+
+
 # --- Serving files and index ---
 # Use Cache-Control headers to prevent browser caching issues, especially for videos that might be replaced.
 @app.after_request
@@ -1736,6 +1800,20 @@ def list_audio_files():
         return jsonify({"error": "Failed to list audio files."}), 500
 
     return jsonify(audio_files)
+
+@app.route('/videos/<int:video_id>/shorts/<int:short_id>', methods=['DELETE'])
+def delete_short(video_id, short_id):
+    session = db.session
+    short = session.get(ShortSegment, short_id)
+    if not short or short.video_id != video_id:
+        return jsonify({'error': 'Short not found'}), 404
+    try:
+        session.delete(short)
+        session.commit()
+        return jsonify({'message': 'Short deleted'}), 200
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 # --- Socket and Run ---
 import socket

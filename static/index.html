@@ -111,6 +111,12 @@
         </button>
         <h3 id="shortsModalTitle">Shorts</h3>
         <div id="shortsModalStatus" class="status"></div>
+        <!-- Bulk Manual Shorts JSON Upload UI -->
+        <div id="bulkShortsUploadContainer" style="margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+          <input type="file" id="bulkShortsFileInput" accept="application/json" style="display: none;" />
+          <button id="bulkShortsUploadBtn" type="button">Bulk Upload Shorts (JSON)</button>
+          <span id="bulkShortsUploadStatus" class="status" style="font-size: 0.95em;"></span>
+        </div>
         <!-- Manual Short Creation Form -->
         <div id="manualShortFormContainer" class="manual-short-form">
           <h4>Add Manual Short</h4>
@@ -977,6 +983,9 @@
 
         // Start periodic refresh ONLY if needed (video or shorts processing)
         clearAndSetRefreshInterval(); // Start interval checks
+
+        // Setup bulk shorts upload UI
+        setupBulkShortsUpload(videoId);
       }
 
       // --- Interval Logic ---
@@ -1214,11 +1223,39 @@
           }">
                              Preview
                          </button>
-                         <!-- <button class="danger" onclick="deleteShort(${videoId}, ${
-            short.id
-          })" title="Delete this short (Not Implemented)">Delete Short</button> -->
                      </div>
                  `;
+
+          setTimeout(() => {
+            const actionsDiv = shortDiv.querySelector('.short-actions');
+            if (actionsDiv) {
+              const removeBtn = document.createElement('button');
+              removeBtn.textContent = 'Remove';
+              removeBtn.className = 'danger';
+              removeBtn.title = 'Delete this short';
+              removeBtn.onclick = async function() {
+                if (!confirm('Delete this short? This cannot be undone.')) return;
+                removeBtn.disabled = true;
+                removeBtn.textContent = 'Removing...';
+                try {
+                  const resp = await fetch(`/videos/${videoId}/shorts/${short.id}`, { method: 'DELETE' });
+                  if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    throw new Error(data.error || 'Failed to delete short.');
+                  }
+                  // Remove from local cache and update UI
+                  videosData[videoId].shorts = videosData[videoId].shorts.filter(s => s.id !== short.id);
+                  updateShortsModal(videoId);
+                } catch (err) {
+                  removeBtn.disabled = false;
+                  removeBtn.textContent = 'Remove';
+                  setStatus('shortsModalStatus', err.message, true, 5000);
+                }
+              };
+              actionsDiv.appendChild(removeBtn);
+            }
+          }, 0);
+
           shortsList.appendChild(shortDiv);
         });
 
@@ -1874,6 +1911,63 @@
         }
       }
       // --- END NEW ---
+
+      // --- Bulk Manual Shorts JSON Upload ---
+      let currentBulkUploadVideoId = null;
+
+      // Attach event listeners after DOMContentLoaded
+      function setupBulkShortsUpload(videoId) {
+        currentBulkUploadVideoId = videoId;
+        const fileInput = document.getElementById('bulkShortsFileInput');
+        const uploadBtn = document.getElementById('bulkShortsUploadBtn');
+        const statusSpan = document.getElementById('bulkShortsUploadStatus');
+
+        if (!fileInput || !uploadBtn) return;
+
+        // Reset status
+        statusSpan.textContent = '';
+        statusSpan.className = 'status';
+        fileInput.value = '';
+
+        uploadBtn.onclick = function() {
+          fileInput.click();
+        };
+
+        fileInput.onchange = async function() {
+          if (!fileInput.files || fileInput.files.length === 0) return;
+          const file = fileInput.files[0];
+          if (!file.name.endsWith('.json')) {
+            statusSpan.textContent = 'Please select a .json file.';
+            statusSpan.className = 'status status-failed';
+            return;
+          }
+          statusSpan.textContent = 'Uploading...';
+          statusSpan.className = 'status status-processing';
+          try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const resp = await fetch(`/videos/${currentBulkUploadVideoId}/shorts/bulk_manual_create`, {
+              method: 'POST',
+              body: formData
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+              statusSpan.textContent = `Uploaded ${data.created} shorts.`;
+              statusSpan.className = 'status status-completed';
+              // Refresh shorts list
+              if (typeof updateShortsModal === 'function') updateShortsModal(currentBulkUploadVideoId);
+            } else {
+              statusSpan.textContent = data.error || 'Upload failed.';
+              statusSpan.className = 'status status-failed';
+            }
+          } catch (e) {
+            statusSpan.textContent = 'Upload error.';
+            statusSpan.className = 'status status-failed';
+          }
+          // Reset file input for next upload
+          fileInput.value = '';
+        };
+      }
     </script>
   </body>
 </html>
