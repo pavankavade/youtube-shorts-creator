@@ -45,9 +45,9 @@ for dir_path in [DATA_DIR, VIDEOS_DIR, EDITED_VIDEOS_DIR, EDITED_SHORTS_DIR, AUD
 
 # Settings
 subtitle_font = "Calibri-Bold" # Consider a more universally available font like Arial-Bold or specify path to font file
-subtitle_fontsize = 60 # Slightly smaller maybe better with wrapping
+subtitle_fontsize = 80 # Slightly smaller maybe better with wrapping
 subtitle_color = "white"
-subtitle_stroke_width = 3 # Slightly smaller maybe better with wrapping
+subtitle_stroke_width = 4 # Slightly smaller maybe better with wrapping
 subtitle_stroke_color = "black"
 # zoom_factor = 2.0 # Default zoom factor removed, now passed as argument
 subtitle_vertical_offset = 550 # May need adjustment after wrapping
