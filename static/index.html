@@ -1170,7 +1170,7 @@
                            short.end_time || ""
                          }" id="end-${
             short.id
-          }" pattern="\\d{1,3}:\\d{2}:\\d{2}(\\.\\d+)?" title="H:MM:SS or HH:MM:SS or H:MM:SS.ms" ${
+          }" pattern="\\d{1,3}:\\d{2}:\\d{2}(\\.\\d+)?" title="H:MM:SS or H:MM:SS.ms" ${
             !canUpdateTimes ? "disabled" : ""
           }>
                          <button onclick="updateShort(${videoId}, ${
@@ -1672,33 +1672,17 @@
       function previewShort(videoId, shortId, startTimeStr, endTimeStr) {
         const videoData = videosData[videoId];
         if (!videoData || !videoData.edited_video_url) {
-          setStatus(
-            "shortsModalStatus",
-            "Full edited video URL not found for preview.",
-            true,
-            5000
-          );
+          setStatus("shortsModalStatus", "Full video not available for preview.", true, 5000);
           return;
         }
         const fullVideoUrl = videoData.edited_video_url;
         const shortData = videoData.shorts?.find((s) => s.id === shortId);
-        const shortName = (shortData?.short_name || `Short ${shortId}`)
-          .replace(/</g, "<")
-          .replace(/>/g, ">");
+        const shortName = (shortData?.short_name || `Short ${shortId}`);
 
         const startSeconds = timeStringToSeconds(startTimeStr);
         if (startSeconds === 0 && !/^0{1,3}:00:00(\.0+)?$/.test(startTimeStr)) {
-          // Check if conversion failed or was legitimately zero
-          if (startTimeStr !== "0:00:00" && startTimeStr !== "00:00:00") {
-            // Allow actual zero start time
-            setStatus(
-              "shortsModalStatus",
-              `Invalid start time format for preview: ${startTimeStr}`,
-              true,
-              5000
-            );
-            return;
-          }
+          setStatus("shortsModalStatus", "Invalid start time for preview.", true, 5000);
+          return;
         }
 
         const videoElement = document.getElementById("modalVideo");
@@ -1712,56 +1696,36 @@
         // Add cache buster
         const separator = fullVideoUrl.includes("?") ? "&" : "?";
         const playableUrl = `${fullVideoUrl}${separator}_=${new Date().getTime()}`;
-        console.log(`Preview: Resetting video state before loading ${playableUrl}`);
-         videoElement.removeAttribute('src'); // Remove old source
-         videoElement.load(); // Important: Reset video element state
-        // Define the function to seek when metadata is loaded
-        // Use a named function attached to the element to make removal easier
-        videoElement._seekOnLoadHandler = () => {
-          if (videoElement.currentSrc === playableUrl) {
-            console.log(
-              `Preview: Metadata loaded for ${playableUrl}. Seeking to ${startSeconds}s`
-            );
-            videoElement.currentTime = startSeconds;
-            videoElement
-              .play()
-              .catch((e) =>
-                console.warn("Preview autoplay may be blocked:", e)
-              );
-          } else {
-            console.log(
-              `Preview: Source changed before seek could happen. Expected: ${playableUrl}, Actual: ${videoElement.currentSrc}`
-            );
-          }
-          // Remove the listener after execution
-          videoElement.removeEventListener(
-            "loadedmetadata",
-            videoElement._seekOnLoadHandler
-          );
-          delete videoElement._seekOnLoadHandler; // Clean up property
-        };
 
-        // Remove any previous listener before adding a new one
+        // Remove any previous event listener
         if (videoElement._seekOnLoadHandler) {
-          videoElement.removeEventListener(
-            "loadedmetadata",
-            videoElement._seekOnLoadHandler
-          );
-          delete videoElement._seekOnLoadHandler;
+          videoElement.removeEventListener("loadedmetadata", videoElement._seekOnLoadHandler);
+          videoElement._seekOnLoadHandler = null;
         }
-        videoElement.addEventListener(
-          "loadedmetadata",
-          videoElement._seekOnLoadHandler
-        );
 
-        console.log(`Preview: Setting src to ${playableUrl} and showing modal.`);
-         // The reset (removeAttribute, load) should have happened *before* the event listener was added.
-         // Now just set the source.
-         videoElement.src = playableUrl; // Set the new source
+        // Define the function to seek when metadata is loaded
+        videoElement._seekOnLoadHandler = function () {
+          // Only seek if the video is loaded and ready
+          try {
+            videoElement.currentTime = startSeconds;
+          } catch (e) {
+            // fallback: try again after a short delay
+            setTimeout(() => {
+              try { videoElement.currentTime = startSeconds; } catch (e2) {}
+            }, 200);
+          }
+          // Remove this handler after seeking
+          videoElement.removeEventListener("loadedmetadata", videoElement._seekOnLoadHandler);
+          videoElement._seekOnLoadHandler = null;
+        };
+        videoElement.addEventListener("loadedmetadata", videoElement._seekOnLoadHandler);
 
-         videoModal.style.display = 'block';
-         document.body.style.overflow = 'hidden';
-         document.body.classList.add('modal-open'); // Add class to body
+        // Set src and show modal
+        videoElement.src = playableUrl;
+        videoElement.load(); // Reset video element state
+        videoModal.style.display = "block";
+        document.body.style.overflow = "hidden";
+        document.body.classList.add("modal-open");
       }
 
       // --- Delete Video ---
