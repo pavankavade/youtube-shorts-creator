@@ -205,6 +205,17 @@
       </div>
     </div>
 
+    <!-- Transcript Modal -->
+    <div id="transcriptModal" class="modal">
+      <div class="modal-content" id="transcriptModalContent" style="max-width: 700px;">
+        <button class="close-button" onclick="closeTranscriptModal()" aria-label="Close Transcript">×</button>
+        <h3 id="transcriptModalTitle">Transcript</h3>
+        <div id="transcriptModalStatus" class="status"></div>
+        <pre id="transcriptText" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto; background: #222; color: #fff; padding: 12px; border-radius: 6px; margin-bottom: 12px;"></pre>
+        <button id="copyTranscriptBtn" style="margin-bottom: 8px;">Copy</button>
+      </div>
+    </div>
+
     <script>
       // Store video data locally
       let videosData = {};
@@ -598,6 +609,7 @@
           }">
                             Play Full
                         </button>
+                        <button onclick="showTranscript(${video.id}, '${(video.title || video.original_filename).replace(/'/g, "\\'") || ''}')" style="margin-left:6px;">View Transcript</button>
                     </td>
                     <td data-label="Shorts">
                         <button onclick="showShorts(${
@@ -1813,6 +1825,7 @@
         const videoModal = document.getElementById("videoModal");
         const shortsModal = document.getElementById("shortsModal");
         const audioModal = document.getElementById("audioSelectionModal"); // Get audio modal
+        const transcriptModal = document.getElementById("transcriptModal"); // Get transcript modal
         if (event.target == videoModal) {
           // Clicked on the semi-transparent background
           closeVideoModal();
@@ -1824,6 +1837,10 @@
         if (event.target == audioModal) {
           // Clicked on the audio modal background
           closeAudioSelectionModal();
+        }
+        if (event.target == transcriptModal) {
+          // Clicked on the transcript modal background
+          closeTranscriptModal();
         }
       });
 
@@ -1844,6 +1861,10 @@
             document.getElementById("shortsModal").style.display === "block"
           ) {
             closeShortsModal();
+          } else if (
+            document.getElementById("transcriptModal").style.display === "block"
+          ) {
+            closeTranscriptModal();
           }
         }
       });
@@ -1957,6 +1978,49 @@
           fileInput.value = '';
         };
       }
+
+      // --- Transcript Modal Functions ---
+      function closeTranscriptModal() {
+        document.getElementById('transcriptModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+        document.body.classList.remove('modal-open');
+        document.getElementById('transcriptText').textContent = '';
+        document.getElementById('transcriptModalStatus').textContent = '';
+      }
+
+      async function showTranscript(videoId, videoTitle) {
+        const modal = document.getElementById('transcriptModal');
+        const textEl = document.getElementById('transcriptText');
+        const statusEl = document.getElementById('transcriptModalStatus');
+        document.getElementById('transcriptModalTitle').textContent = `Transcript for: ${videoTitle}`;
+        textEl.textContent = '';
+        statusEl.textContent = 'Loading transcript...';
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        document.body.classList.add('modal-open');
+        try {
+          const resp = await fetch(`/videos/${videoId}/transcript?_=${Date.now()}`);
+          if (!resp.ok) throw new Error('Transcript not available.');
+          const data = await resp.json();
+          if (!data.transcript) throw new Error('Transcript not found.');
+          textEl.textContent = data.transcript;
+          statusEl.textContent = '';
+        } catch (e) {
+          textEl.textContent = '';
+          statusEl.textContent = e.message;
+        }
+      }
+
+      document.getElementById('copyTranscriptBtn').onclick = function() {
+        const text = document.getElementById('transcriptText').textContent;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(() => {
+            document.getElementById('transcriptModalStatus').textContent = 'Copied!';
+            setTimeout(() => document.getElementById('transcriptModalStatus').textContent = '', 1200);
+          });
+        }
+      };
+      // --- End Transcript Modal Functions ---
     </script>
   </body>
 </html>

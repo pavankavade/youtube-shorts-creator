@@ -1,0 +1,222 @@
+/* --- Basic Styling --- */
+body {
+    font-family: sans-serif;
+    margin: 20px;
+    background-color: #f4f4f4;
+    line-height: 1.6;
+}
+
+.container {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    max-width: 900px; /* Adjust as needed */
+    margin: auto;
+}
+
+h1, h2, h3 {
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+}
+
+input[type="file"],
+input[type="text"],
+input[type="number"],
+input[type="color"],
+select,
+textarea {
+    width: calc(100% - 22px); /* Account for padding/border */
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* Important for width calculation */
+    font-size: 1em;
+}
+
+textarea {
+    height: 60px;
+    resize: vertical;
+}
+
+button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 10px;
+    transition: background-color 0.2s ease; /* Smooth hover */
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+small {
+    font-size: 0.85em;
+    color: #666;
+    display: block; /* Ensure it appears below input */
+    margin-top: -10px; /* Adjust spacing */
+    margin-bottom: 10px;
+}
+
+/* --- Layout & Structure --- */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+#editArea {
+    margin-top: 30px;
+    border-top: 2px solid #eee;
+    padding-top: 20px;
+}
+
+/* --- Subtitle Editor Table --- */
+.subtitle-table-container {
+    max-height: 400px; /* Limit height and enable scroll */
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 5px;
+    margin-bottom: 20px; /* Space before next section */
+}
+
+.subtitle-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.subtitle-table th,
+.subtitle-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+    vertical-align: top; /* Align text area nicely */
+}
+
+.subtitle-table th {
+    background-color: #f2f2f2;
+    position: sticky; /* Make header sticky within scrollable container */
+    top: 0;
+    z-index: 10;
+}
+
+.subtitle-table td:first-child { /* Timestamps */
+    width: 150px;
+    white-space: nowrap;
+    font-size: 0.9em;
+    font-family: monospace;
+}
+
+.subtitle-table td:nth-child(2) { /* Text */
+    width: auto;
+}
+
+.subtitle-table textarea {
+    width: 98%; /* Slightly less than 100% */
+    margin: 0;
+    padding: 4px;
+    height: 50px;
+    border: 1px solid #e0e0e0; /* Lighter border for textareas */
+    font-size: 0.95em;
+}
+.subtitle-table textarea:focus {
+    border-color: #aaa;
+    outline: none;
+}
+
+
+/* --- Status & Video Player --- */
+#status {
+    margin-top: 15px;
+    font-style: italic;
+    color: #555;
+    font-weight: bold;
+    min-height: 20px; /* Prevent layout shifts */
+    padding: 10px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    border-left: 5px solid #007bff;
+}
+#status strong {
+    color: #dc3545; /* Red for error emphasis */
+}
+#status pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background-color: #f8f9fa;
+    padding: 5px;
+    border-radius: 3px;
+    max-height: 100px;
+    overflow-y: auto;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+
+.video-player {
+    margin-top: 20px;
+    max-width: 100%;
+    background-color: #eee;
+    padding: 10px;
+    border-radius: 5px;
+}
+.video-player video {
+    display: block; /* Prevents extra space below video */
+    max-width: 100%; /* Ensure video is responsive */
+    height: auto;
+}
+
+/* --- Utility Classes --- */
+.hidden {
+    display: none !important; /* Use !important to override other display rules if necessary */
+}
+
+/* --- Processing Overlay --- */
+.processing-overlay {
+    position: fixed; /* Cover the whole viewport */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent black */
+    color: white;
+    display: flex; /* Center content */
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5em;
+    z-index: 1000; /* Ensure it's on top */
+    text-align: center;
+    padding: 20px;
+}
+
+/* --- Step Visibility (Alternative to JS-only hiding, less common) ---
+#editStep, #resultStep {
+    display: none;
+} */

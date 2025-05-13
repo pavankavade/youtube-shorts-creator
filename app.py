@@ -1815,6 +1815,21 @@ def delete_short(video_id, short_id):
         session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/videos/<int:video_id>/transcript', methods=['GET'])
+def get_video_transcript(video_id):
+    session = db.session
+    video = session.get(Video, video_id)
+    if not video:
+        session.close()
+        return jsonify({'error': 'Video not found.'}), 404
+
+    transcript_text = get_subtitle_text_content(video)
+    session.close()
+    if transcript_text:
+        return jsonify({'transcript': transcript_text}), 200
+    else:
+        return jsonify({'error': 'Transcript not available.'}), 404
+
 # --- Socket and Run ---
 import socket
 
