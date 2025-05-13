@@ -13,6 +13,7 @@ from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 import google.generativeai as genai
 from google.generativeai import types as genai_types
+from flask_cors import CORS # Add this import
 
 # Import the required functions from createshorts
 from createshorts import (
@@ -34,6 +35,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Increase timeout for longer operations if needed
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_timeout': 30, 'pool_recycle': 280}
 
+CORS(app) # Initialize CORS for the entire app. For production, be more specific
 db = SQLAlchemy(app) # Use default SQLAlchemy initialization
 migrate = Migrate(app, db)
 

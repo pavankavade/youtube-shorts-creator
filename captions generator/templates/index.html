@@ -1,503 +1,883 @@
+<!-- captions generator/templates/main.py -->
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Video Captioner</title>
     <!-- Using inline styles for simplicity, or link to static/style.css -->
     <style>
-        /* --- Basic Styling --- */
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            margin: 20px;
-            background-color: #f4f7f6;
-            line-height: 1.6;
-            color: #333;
-        }
-        .container {
-            background-color: #fff;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            max-width: 950px;
-            margin: auto;
-        }
-        h1, h2, h3 {
-            color: #2c3e50;
-            border-bottom: 1px solid #e0e0e0;
-            padding-bottom: 8px;
-            margin-top: 1.5em;
-            margin-bottom: 1em;
-        }
-        h1 { font-size: 1.8em; margin-top: 0.5em;}
-        h2 { font-size: 1.4em; }
-        h3 { font-size: 1.15em; border-bottom: none; margin-bottom: 0.8em;}
+      /* --- Basic Styling --- */
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue",
+          sans-serif;
+        margin: 20px;
+        background-color: #f4f7f6;
+        line-height: 1.6;
+        color: #333;
+      }
+      .container {
+        background-color: #fff;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        max-width: 950px;
+        margin: auto;
+      }
+      h1,
+      h2,
+      h3 {
+        color: #2c3e50;
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 8px;
+        margin-top: 1.5em;
+        margin-bottom: 1em;
+      }
+      h1 {
+        font-size: 1.8em;
+        margin-top: 0.5em;
+      }
+      h2 {
+        font-size: 1.4em;
+      }
+      h3 {
+        font-size: 1.15em;
+        border-bottom: none;
+        margin-bottom: 0.8em;
+      }
 
-        label {
-            display: block;
-            margin-top: 12px;
-            margin-bottom: 6px;
-            font-weight: 600;
-            color: #555;
-            font-size: 0.95em;
-        }
-        input[type="file"], input[type="text"], input[type="number"], input[type="color"], select, textarea {
-            width: 100%; /* Use 100% width */
-            padding: 10px 12px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box; /* Include padding/border in width */
-            font-size: 0.95em;
-            background-color: #fff;
-        }
-        input[type="color"] { padding: 5px; height: 40px; } /* Adjust color picker height */
-        textarea { height: 65px; resize: vertical; line-height: 1.5; }
-        button {
-            background-color: #3498db; /* Blue */
-            color: white;
-            padding: 10px 18px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 500;
-            margin-top: 10px;
-            transition: background-color 0.2s ease, transform 0.1s ease;
-        }
-        button:hover { background-color: #2980b9; }
-        button:active { transform: scale(0.98); }
-        button:disabled { background-color: #bdc3c7; cursor: not-allowed; } /* Grey */
-        small { font-size: 0.85em; color: #7f8c8d; display: block; margin-top: -10px; margin-bottom: 10px; }
+      label {
+        display: block;
+        margin-top: 12px;
+        margin-bottom: 6px;
+        font-weight: 600;
+        color: #555;
+        font-size: 0.95em;
+      }
+      input[type="file"],
+      input[type="text"],
+      input[type="number"],
+      input[type="color"],
+      select,
+      textarea {
+        width: 100%; /* Use 100% width */
+        padding: 10px 12px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box; /* Include padding/border in width */
+        font-size: 0.95em;
+        background-color: #fff;
+      }
+      input[type="color"] {
+        padding: 5px;
+        height: 40px;
+      } /* Adjust color picker height */
+      textarea {
+        height: 65px;
+        resize: vertical;
+        line-height: 1.5;
+      }
+      button {
+        background-color: #3498db; /* Blue */
+        color: white;
+        padding: 10px 18px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 500;
+        margin-top: 10px;
+        transition: background-color 0.2s ease, transform 0.1s ease;
+      }
+      button:hover {
+        background-color: #2980b9;
+      }
+      button:active {
+        transform: scale(0.98);
+      }
+      button:disabled {
+        background-color: #bdc3c7;
+        cursor: not-allowed;
+      } /* Grey */
+      small {
+        font-size: 0.85em;
+        color: #7f8c8d;
+        display: block;
+        margin-top: -10px;
+        margin-bottom: 10px;
+      }
 
-        /* --- Layout & Structure --- */
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px 20px; }
-        .form-group { display: flex; flex-direction: column; }
-        #editArea { margin-bottom: 20px; }
-        #resultContainer { border-top: 2px solid #eee; padding-top: 20px; margin-top: 20px; }
-        hr { border: none; border-top: 1px solid #eee; margin: 30px 0; }
+      /* --- Layout & Structure --- */
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 15px 20px;
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+      }
+      #editArea {
+        margin-bottom: 20px;
+      }
+      #resultContainer {
+        border-top: 2px solid #eee;
+        padding-top: 20px;
+        margin-top: 20px;
+      }
+      hr {
+        border: none;
+        border-top: 1px solid #eee;
+        margin: 30px 0;
+      }
 
-        /* --- Subtitle Editor Table --- */
-        .subtitle-table-container { max-height: 450px; overflow-y: auto; border: 1px solid #ccc; padding: 0; margin-bottom: 20px; background-color: #fdfdfd;}
-        .subtitle-table { width: 100%; border-collapse: collapse; }
-        .subtitle-table th, .subtitle-table td { border: 1px solid #ddd; padding: 9px 12px; text-align: left; vertical-align: top; }
-        .subtitle-table th { background-color: #ecf0f1; position: sticky; top: 0; z-index: 10; font-weight: 600; }
-        .subtitle-table td:first-child { width: 160px; white-space: nowrap; font-size: 0.9em; font-family: 'Courier New', Courier, monospace; color: #34495e; }
-        .subtitle-table textarea { width: 100%; margin: 0; padding: 6px; height: 55px; border: 1px solid #ecf0f1; font-size: 0.95em; box-sizing: border-box; }
-        .subtitle-table textarea:focus { border-color: #3498db; outline: none; box-shadow: 0 0 3px rgba(52, 152, 219, 0.5); }
+      /* --- Subtitle Editor Table --- */
+      .subtitle-table-container {
+        max-height: 450px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        padding: 0;
+        margin-bottom: 20px;
+        background-color: #fdfdfd;
+      }
+      .subtitle-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .subtitle-table th,
+      .subtitle-table td {
+        border: 1px solid #ddd;
+        padding: 9px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+      .subtitle-table th {
+        background-color: #ecf0f1;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        font-weight: 600;
+      }
+      .subtitle-table td:first-child {
+        width: 160px;
+        white-space: nowrap;
+        font-size: 0.9em;
+        font-family: "Courier New", Courier, monospace;
+        color: #34495e;
+      }
+      .subtitle-table textarea {
+        width: 100%;
+        margin: 0;
+        padding: 6px;
+        height: 55px;
+        border: 1px solid #ecf0f1;
+        font-size: 0.95em;
+        box-sizing: border-box;
+      }
+      .subtitle-table textarea:focus {
+        border-color: #3498db;
+        outline: none;
+        box-shadow: 0 0 3px rgba(52, 152, 219, 0.5);
+      }
 
-        /* --- Status & Video Player --- */
-        #status { margin-top: 20px; margin-bottom: 20px; font-weight: 500; min-height: 20px; padding: 12px 15px; background-color: #e8f4fd; border-radius: 5px; border-left: 5px solid #3498db; color: #2980b9; }
-        #status strong { color: #e74c3c; /* Red for error emphasis */ }
-        #status pre { white-space: pre-wrap; word-wrap: break-word; background-color: #f4f4f4; border: 1px solid #ddd; padding: 8px; border-radius: 3px; max-height: 120px; overflow-y: auto; font-size: 0.9em; margin-top: 8px; color: #555;}
-        .video-player { margin-top: 20px; max-width: 100%; background-color: #ecf0f1; padding: 15px; border-radius: 5px; }
-        .video-player video { display: block; max-width: 100%; height: auto; background-color: #000; border-radius: 3px; }
+      /* --- Status & Video Player --- */
+      #status {
+        margin-top: 20px;
+        margin-bottom: 20px;
+        font-weight: 500;
+        min-height: 20px;
+        padding: 12px 15px;
+        background-color: #e8f4fd;
+        border-radius: 5px;
+        border-left: 5px solid #3498db;
+        color: #2980b9;
+      }
+      #status strong {
+        color: #e74c3c; /* Red for error emphasis */
+      }
+      #status pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        background-color: #f4f4f4;
+        border: 1px solid #ddd;
+        padding: 8px;
+        border-radius: 3px;
+        max-height: 120px;
+        overflow-y: auto;
+        font-size: 0.9em;
+        margin-top: 8px;
+        color: #555;
+      }
+      .video-player {
+        margin-top: 20px;
+        max-width: 100%;
+        background-color: #ecf0f1;
+        padding: 15px;
+        border-radius: 5px;
+      }
+      .video-player video {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        background-color: #000;
+        border-radius: 3px;
+      }
 
-        /* --- Processing Overlay --- */
-        .processing-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(44, 62, 80, 0.85); /* Darker semi-transparent */
-            color: white; display: flex; justify-content: center; align-items: center;
-            font-size: 1.6em; z-index: 1000; text-align: center; padding: 20px;
-            font-weight: 500;
-            /* Starts visible, JS hides it */
-        }
+      /* --- Processing Overlay --- */
+      .processing-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(44, 62, 80, 0.85); /* Darker semi-transparent */
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 1.6em;
+        z-index: 1000;
+        text-align: center;
+        padding: 20px;
+        font-weight: 500;
+        /* Starts visible, JS hides it */
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <h1>Video Captioner with Editing & Regeneration</h1>
+      <h1>Video Captioner with Editing & Regeneration</h1>
 
-        <!-- Step 1: Upload and Transcribe Options -->
-        <div id="transcribeStep">
-             <h2>Start Here or Upload New Video</h2>
-             <form id="transcribeForm" enctype="multipart/form-data">
-                 <div class="form-group">
-                    <label for="video_file">1. Video File:</label>
-                    <input type="file" id="video_file" name="video_file" accept="video/*,audio/*" required>
-                    <small>Select a video or audio file.</small>
-                </div>
-                <div class="form-grid">
-                     <div class="form-group">
-                        <label for="whisper_model">2. Whisper Model:</label>
-                        <select id="whisper_model" name="whisper_model">
-                            <option value="tiny" selected>Tiny (Fastest, Least Accurate)</option>
-                            <option value="base">Base</option>
-                            <option value="small">Small</option>
-                            <option value="medium">Medium</option>
-                            <option value="large">Large (Slowest, Most Accurate)</option>
-                        </select>
-                        <small>Larger models require more time & resources.</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="words_per_segment">3. Words Per Subtitle Line:</label>
-                        <select id="words_per_segment" name="words_per_segment">
-                            <option value="0" >Automatic (Whisper Segments)</option>
-                            <option value="1">1 Word</option>
-                            <option value="2">2 Words</option>
-                            <option value="3" selected>3 Words</option>
-                            <option value="4">4 Words</option>
-                            <option value="5">5 Words</option>
-                            <option value="6">6 Words</option>
-                            <option value="7">7 Words</option>
-                            <option value="8">8 Words</option>
-                        </select>
-                        <small>Split into smaller chunks (needs word timestamps).</small>
-                    </div>
-                </div>
-                 <br>
-                 <button type="submit" id="transcribeButton">Transcribe Video</button>
-             </form>
-         </div>
-
-        <!-- Status Display -->
-        <div id="status">Select a video file and click Transcribe.</div>
-         <!-- Processing Overlay -->
-        <div id="processingOverlay" class="processing-overlay">Processing... Please Wait</div>
-
-        <!-- Step 2: Edit Subtitles, Finalize & View Result -->
-        <div id="editAndResultStep" style="display: none;">
-
-            <div id="editArea">
-                 <h2>4. Edit Subtitles</h2>
-                 <p>Review and edit the transcribed text below. Timestamps are in HH:MM:SS,mmm format.</p>
-                <div class="subtitle-table-container">
-                     <table id="subtitleTable" class="subtitle-table">
-                         <thead><tr><th>Time</th><th>Text (Editable)</th></tr></thead>
-                         <tbody><!-- Populated by JS --></tbody>
-                     </table>
-                 </div>
-             </div>
-
-            <form id="finalizeForm">
-                 <h2>5. Caption Styling & Positioning</h2>
-                 <p>Adjust styling and click "Generate Video". You can regenerate with new styles using the same text edits.</p>
-                 <div class="form-grid">
-                    <div class="form-group"><label for="font_size">Font Size (px):</label><input type="number" id="font_size" name="font_size" value="16" min="1"></div>
-                    <div class="form-group"><label for="font_name">Font Name:</label><input type="text" id="font_name" name="font_name" value="Verdana"><small>e.g., Arial, Verdana, Trebuchet MS.</small></div>
-                    <div class="form-group"><label for="font_color">Font Color:</label><input type="color" id="font_color" name="font_color" value="#FFFFFF"></div>
-                    <div class="form-group"><label for="outline_color">Outline Color:</label><input type="color" id="outline_color" name="outline_color" value="#000000"></div>
-                    <div class="form-group"><label for="outline_width">Outline Width (px):</label><input type="number" id="outline_width" name="outline_width" value="2" min="0"></div>
-                    <div class="form-group"><label for="shadow_offset">Shadow Offset (px):</label><input type="number" id="shadow_offset" name="shadow_offset" value="1" min="0"></div>
-                    <div class="form-group">
-                        <label for="position">Base Position:</label>
-                        <select id="position" name="position">
-                            <option value="2" selected>Bottom Center (Slightly Below Screen Center)</option>
-                            <option value="1">Bottom Left</option>
-                            <option value="3">Bottom Right</option>
-                            <option value="5">Middle Center</option>
-                            <option value="4">Middle Left</option>
-                            <option value="6">Middle Right</option>
-                            <option value="8">Top Center</option>
-                            <option value="7">Top Left</option>
-                            <option value="9">Top Right</option>
-                        </select>
-                         <small>Numpad layout (2=BottomCenter). "Bottom Center" is placed higher from the edge for better viewing.</small>
-                    </div>
-                    <!-- X and Y Offset fields are removed -->
-                 </div>
-                <br>
-                <button type="submit" id="finalizeButton">Generate Video</button>
-            </form>
-
-            <!-- Result Container - Shown after first generation -->
-            <div id="resultContainer" style="display: none;">
-                 <h2>6. Result</h2>
-                 <div class="video-player">
-                    <video id="processedVideo" width="720" controls></video> <!-- Increased default size -->
-                 </div>
+      <!-- Step 1: Upload and Transcribe Options -->
+      <div id="transcribeStep">
+        <h2>Start Here or Upload New Video</h2>
+        <form id="transcribeForm" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="video_file">1. Video File:</label>
+            <input
+              type="file"
+              id="video_file"
+              name="video_file"
+              accept="video/*,audio/*"
+              required
+            />
+            <small>Select a video or audio file.</small>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="whisper_model">2. Whisper Model:</label>
+              <select id="whisper_model" name="whisper_model">
+                <option value="tiny" selected>
+                  Tiny (Fastest, Least Accurate)
+                </option>
+                <option value="base">Base</option>
+                <option value="small">Small</option>
+                <option value="medium">Medium</option>
+                <option value="large">Large (Slowest, Most Accurate)</option>
+              </select>
+              <small>Larger models require more time & resources.</small>
             </div>
+            <div class="form-group">
+              <label for="words_per_segment">3. Words Per Subtitle Line:</label>
+              <select id="words_per_segment" name="words_per_segment">
+                <option value="0">Automatic (Whisper Segments)</option>
+                <option value="1">1 Word</option>
+                <option value="2">2 Words</option>
+                <option value="3" selected>3 Words</option>
+                <option value="4">4 Words</option>
+                <option value="5">5 Words</option>
+                <option value="6">6 Words</option>
+                <option value="7">7 Words</option>
+                <option value="8">8 Words</option>
+              </select>
+              <small>Split into smaller chunks (needs word timestamps).</small>
+            </div>
+          </div>
+          <br />
+          <button type="submit" id="transcribeButton">Transcribe Video</button>
+        </form>
+      </div>
 
-            <hr>
-            <button onclick="resetApp()">Start New Transcription</button>
+      <!-- Status Display -->
+      <div id="status">Select a video file and click Transcribe.</div>
+      <!-- Processing Overlay -->
+      <div id="processingOverlay" class="processing-overlay">
+        Processing... Please Wait
+      </div>
 
-        </div> <!-- End of editAndResultStep -->
+      <!-- Step 2: Edit Subtitles, Finalize & View Result -->
+      <div id="editAndResultStep" style="display: none">
+        <div id="editArea">
+          <h2>4. Edit Subtitles</h2>
+          <p>
+            Review and edit the transcribed text below. Timestamps are in
+            HH:MM:SS,mmm format.
+          </p>
+          <div class="subtitle-table-container">
+            <table id="subtitleTable" class="subtitle-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Text (Editable)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-    </div> <!-- End of container -->
+        <form id="finalizeForm">
+          <h2>5. Caption Styling & Positioning</h2>
+          <p>
+            Adjust styling and click "Generate Video". You can regenerate with
+            new styles using the same text edits.
+          </p>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="font_size">Font Size (px):</label
+              ><input
+                type="number"
+                id="font_size"
+                name="font_size"
+                value="16"
+                min="1"
+              />
+            </div>
+            <div class="form-group">
+              <label for="font_name">Font Name:</label
+              ><input
+                type="text"
+                id="font_name"
+                name="font_name"
+                value="Verdana"
+              /><small>e.g., Arial, Verdana, Trebuchet MS.</small>
+            </div>
+            <div class="form-group">
+              <label for="font_color">Font Color:</label
+              ><input
+                type="color"
+                id="font_color"
+                name="font_color"
+                value="#FFFFFF"
+              />
+            </div>
+            <div class="form-group">
+              <label for="outline_color">Outline Color:</label
+              ><input
+                type="color"
+                id="outline_color"
+                name="outline_color"
+                value="#000000"
+              />
+            </div>
+            <div class="form-group">
+              <label for="outline_width">Outline Width (px):</label
+              ><input
+                type="number"
+                id="outline_width"
+                name="outline_width"
+                value="1"
+                min="0"
+              />
+            </div>
+            <div class="form-group">
+              <label for="shadow_offset">Shadow Offset (px):</label
+              ><input
+                type="number"
+                id="shadow_offset"
+                name="shadow_offset"
+                value="1"
+                min="0"
+              />
+            </div>
+            <div class="form-group">
+              <label for="position">Base Position:</label>
+              <select id="position" name="position">
+                <option value="2" selected>
+                  Bottom Center (Slightly Below Screen Center)
+                </option>
+                <option value="1">Bottom Left</option>
+                <option value="3">Bottom Right</option>
+                <option value="5">Middle Center</option>
+                <option value="4">Middle Left</option>
+                <option value="6">Middle Right</option>
+                <option value="8">Top Center</option>
+                <option value="7">Top Left</option>
+                <option value="9">Top Right</option>
+              </select>
+              <small
+                >Numpad layout (2=BottomCenter). "Bottom Center" is placed
+                higher from the edge for better viewing.</small
+              >
+            </div>
+            <!-- X and Y Offset fields are removed -->
+          </div>
+          <br />
+          <button type="submit" id="finalizeButton">Generate Video</button>
+        </form>
+
+        <!-- Result Container - Shown after first generation -->
+        <div id="resultContainer" style="display: none">
+          <h2>6. Result</h2>
+          <div class="video-player">
+            <video id="processedVideo" width="720" controls></video>
+            <!-- Increased default size -->
+          </div>
+        </div>
+
+        <hr />
+        <button onclick="resetApp()">Start New Transcription</button>
+      </div>
+      <!-- End of editAndResultStep -->
+    </div>
+    <!-- End of container -->
 
     <script>
-        // --- Variable Declarations (Use LET) ---
-        let transcribeForm, finalizeForm, statusDiv, videoPlayer, subtitleTableBody, processingOverlay;
-        let transcribeStepDiv, editAndResultStepDiv, resultContainer;
-        let transcribeButton, finalizeButton;
-        let currentSegments = [];
-        let tempVideoPath = '';
-        let outputSuffix = '.mp4';
+      // --- Variable Declarations (Use LET) ---
+      let transcribeForm,
+        finalizeForm,
+        statusDiv,
+        videoPlayer,
+        subtitleTableBody,
+        processingOverlay;
+      let transcribeStepDiv, editAndResultStepDiv, resultContainer;
+      let transcribeButton, finalizeButton;
+      let currentSegments = [];
+      let tempVideoPath = "";
+      let outputSuffix = ".mp4";
 
-        // --- Helper Functions ---
-        function formatTimeDisplay(seconds) {
-             if (seconds == null || isNaN(seconds) || seconds < 0) seconds = 0.0;
-             const date = new Date(0);
-             date.setSeconds(seconds);
-             try {
-                return date.toISOString().substr(11, 12); // HH:MM:SS.sss
-             } catch (e) {
-                console.error("Error formatting time:", seconds, e);
-                return "00:00:00,000";
-             }
+      // --- Helper Functions ---
+      function formatTimeDisplay(seconds) {
+        if (seconds == null || isNaN(seconds) || seconds < 0) seconds = 0.0;
+        const date = new Date(0);
+        date.setSeconds(seconds);
+        try {
+          return date.toISOString().substr(11, 12); // HH:MM:SS.sss
+        } catch (e) {
+          console.error("Error formatting time:", seconds, e);
+          return "00:00:00,000";
+        }
+      }
+
+      function showProcessing(message = "Processing... Please Wait") {
+        console.log("showProcessing called:", message);
+        if (!processingOverlay) {
+          console.error("showProcessing: processingOverlay element not found!");
+          return;
+        }
+        processingOverlay.textContent = message;
+        processingOverlay.style.display = "flex"; // Use 'flex' for centering
+        if (transcribeButton) transcribeButton.disabled = true;
+        if (finalizeButton) finalizeButton.disabled = true;
+        console.log("showProcessing: Overlay shown, buttons disabled.");
+      }
+
+      function hideProcessing() {
+        console.log("--- hideProcessing CALLED ---");
+        if (!processingOverlay) {
+          console.error("hideProcessing: processingOverlay element not found!");
+          return;
+        }
+        processingOverlay.style.display = "none";
+        console.log("hideProcessing: Set style.display to 'none'.");
+
+        // Re-enable buttons based on which step is VISIBLE
+        const transcribeVisible =
+          transcribeStepDiv &&
+          (transcribeStepDiv.style.display === "block" ||
+            transcribeStepDiv.style.display === "");
+        const editVisible =
+          editAndResultStepDiv &&
+          editAndResultStepDiv.style.display === "block";
+
+        if (transcribeButton) {
+          transcribeButton.disabled = !transcribeVisible; // Enable only if transcribe step is visible
+          console.log(
+            `hideProcessing: Transcribe button disabled: ${!transcribeVisible}`
+          );
+        } else {
+          console.warn("hideProcessing: transcribeButton element not found!");
         }
 
-        function showProcessing(message = 'Processing... Please Wait') {
-            console.log("showProcessing called:", message);
-            if (!processingOverlay) { console.error("showProcessing: processingOverlay element not found!"); return; }
-            processingOverlay.textContent = message;
-            processingOverlay.style.display = 'flex'; // Use 'flex' for centering
-            if (transcribeButton) transcribeButton.disabled = true;
-            if (finalizeButton) finalizeButton.disabled = true;
-            console.log("showProcessing: Overlay shown, buttons disabled.");
+        if (finalizeButton) {
+          finalizeButton.disabled = !editVisible; // Enable only if edit step is visible
+          console.log(
+            `hideProcessing: Finalize button disabled: ${!editVisible}`
+          );
+        } else {
+          console.warn("hideProcessing: finalizeButton element not found!");
+        }
+        console.log("--- hideProcessing END ---");
+      }
+
+      // --- Main Logic Functions ---
+
+      async function handleTranscribeSubmit(event) {
+        event.preventDefault();
+        console.log("handleTranscribeSubmit started");
+        if (!transcribeForm) return;
+        const videoFileInput = document.getElementById("video_file");
+        if (
+          !videoFileInput ||
+          !videoFileInput.files ||
+          videoFileInput.files.length === 0
+        ) {
+          statusDiv.innerHTML =
+            "<strong>Error:</strong> Please select a video file first.";
+          return;
         }
 
-        function hideProcessing() {
-            console.log("--- hideProcessing CALLED ---");
-            if (!processingOverlay) { console.error("hideProcessing: processingOverlay element not found!"); return; }
-            processingOverlay.style.display = 'none';
-            console.log("hideProcessing: Set style.display to 'none'.");
+        statusDiv.textContent =
+          "Uploading and transcribing... This may take some time.";
+        showProcessing("Transcribing...");
+        resetEditArea(); // Clear previous edits and styles form
 
-            // Re-enable buttons based on which step is VISIBLE
-            const transcribeVisible = transcribeStepDiv && (transcribeStepDiv.style.display === 'block' || transcribeStepDiv.style.display === '');
-            const editVisible = editAndResultStepDiv && editAndResultStepDiv.style.display === 'block';
+        if (videoPlayer) videoPlayer.src = ""; // Clear old video
+        if (resultContainer) resultContainer.style.display = "none"; // Hide result area
 
-            if (transcribeButton) {
-                transcribeButton.disabled = !transcribeVisible; // Enable only if transcribe step is visible
-                console.log(`hideProcessing: Transcribe button disabled: ${!transcribeVisible}`);
-            } else { console.warn("hideProcessing: transcribeButton element not found!"); }
+        const formData = new FormData(transcribeForm);
 
-            if (finalizeButton) {
-                finalizeButton.disabled = !editVisible; // Enable only if edit step is visible
-                console.log(`hideProcessing: Finalize button disabled: ${!editVisible}`);
-            } else { console.warn("hideProcessing: finalizeButton element not found!"); }
-             console.log("--- hideProcessing END ---");
+        try {
+          const response = await fetch("/transcribe/", {
+            method: "POST",
+            body: formData,
+          });
+          const result = await response.json();
+          if (!response.ok)
+            throw new Error(result?.detail || `HTTP ${response.status}`);
+          if (!result || typeof result !== "object" || !result.temp_video_path)
+            throw new Error("Invalid server response during transcription.");
+
+          currentSegments = result.segments || [];
+          tempVideoPath = result.temp_video_path;
+          outputSuffix = result.output_suffix || ".mp4";
+
+          if (currentSegments.length === 0) {
+            statusDiv.textContent =
+              "Transcription complete, but no subtitles were generated. The audio might be silent or unsupported.";
+            populateEditTable([]); // Show empty table
+          } else {
+            populateEditTable(currentSegments);
+            statusDiv.textContent =
+              "Transcription complete. Edit subtitles below and adjust styles, then click Generate Video.";
+          }
+
+          // Show the editing/results area
+          if (transcribeStepDiv) transcribeStepDiv.style.display = "none";
+          if (editAndResultStepDiv)
+            editAndResultStepDiv.style.display = "block";
+        } catch (error) {
+          console.error("Transcription Error:", error);
+          statusDiv.innerHTML = `<strong>Transcription Error:</strong><br><pre>${error.message}</pre>`;
+          // Keep transcribe step visible on error maybe? Or allow reset.
+          if (transcribeStepDiv) transcribeStepDiv.style.display = "block";
+          if (editAndResultStepDiv) editAndResultStepDiv.style.display = "none";
+        } finally {
+          hideProcessing(); // Handles button enabling/disabling
         }
+      }
 
-        // --- Main Logic Functions ---
+      function resetEditArea() {
+        // Only clears table and resets style form, keeps temp path etc.
+        if (subtitleTableBody) subtitleTableBody.innerHTML = "";
+        // currentSegments = []; // Keep current segments if user only wants to regenerate styles
+        if (finalizeForm) finalizeForm.reset(); // Reset styling options
+        console.log("Edit area reset (table cleared, styles form reset)");
+      }
 
-        async function handleTranscribeSubmit(event) {
-            event.preventDefault();
-            console.log("handleTranscribeSubmit started");
-            if (!transcribeForm) return;
-            const videoFileInput = document.getElementById('video_file');
-            if (!videoFileInput || !videoFileInput.files || videoFileInput.files.length === 0) {
-                statusDiv.innerHTML = "<strong>Error:</strong> Please select a video file first.";
-                return;
-            }
-
-            statusDiv.textContent = 'Uploading and transcribing... This may take some time.';
-            showProcessing('Transcribing...');
-            resetEditArea(); // Clear previous edits and styles form
-
-            if (videoPlayer) videoPlayer.src = ''; // Clear old video
-            if (resultContainer) resultContainer.style.display = 'none'; // Hide result area
-
-            const formData = new FormData(transcribeForm);
-
-            try {
-                const response = await fetch('/transcribe/', { method: 'POST', body: formData });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result?.detail || `HTTP ${response.status}`);
-                if (!result || typeof result !== 'object' || !result.temp_video_path) throw new Error("Invalid server response during transcription.");
-
-                currentSegments = result.segments || [];
-                tempVideoPath = result.temp_video_path;
-                outputSuffix = result.output_suffix || '.mp4';
-
-                if (currentSegments.length === 0) {
-                    statusDiv.textContent = 'Transcription complete, but no subtitles were generated. The audio might be silent or unsupported.';
-                    populateEditTable([]); // Show empty table
-                } else {
-                    populateEditTable(currentSegments);
-                    statusDiv.textContent = 'Transcription complete. Edit subtitles below and adjust styles, then click Generate Video.';
-                }
-
-                // Show the editing/results area
-                if(transcribeStepDiv) transcribeStepDiv.style.display = 'none';
-                if(editAndResultStepDiv) editAndResultStepDiv.style.display = 'block';
-
-            } catch (error) {
-                console.error('Transcription Error:', error);
-                statusDiv.innerHTML = `<strong>Transcription Error:</strong><br><pre>${error.message}</pre>`;
-                // Keep transcribe step visible on error maybe? Or allow reset.
-                if(transcribeStepDiv) transcribeStepDiv.style.display = 'block';
-                if(editAndResultStepDiv) editAndResultStepDiv.style.display = 'none';
-            } finally {
-                 hideProcessing(); // Handles button enabling/disabling
-            }
+      function populateEditTable(segments) {
+        if (!subtitleTableBody) {
+          console.error("populateEditTable: subtitleTableBody not found!");
+          return;
         }
-
-        function resetEditArea() {
-             // Only clears table and resets style form, keeps temp path etc.
-             if(subtitleTableBody) subtitleTableBody.innerHTML = '';
-             // currentSegments = []; // Keep current segments if user only wants to regenerate styles
-             if(finalizeForm) finalizeForm.reset(); // Reset styling options
-             console.log("Edit area reset (table cleared, styles form reset)");
+        subtitleTableBody.innerHTML = ""; // Clear previous entries
+        if (!segments || segments.length === 0) {
+          console.log("populateEditTable: No segments to display.");
+          // Optionally display a message in the table
+          const row = subtitleTableBody.insertRow();
+          const cell = row.insertCell();
+          cell.colSpan = 2;
+          cell.textContent = "No subtitles generated.";
+          cell.style.textAlign = "center";
+          cell.style.fontStyle = "italic";
+          return;
         }
+        segments.forEach((segment, index) => {
+          const row = subtitleTableBody.insertRow();
+          row.setAttribute("data-index", index);
 
-        function populateEditTable(segments) {
-             if(!subtitleTableBody) { console.error("populateEditTable: subtitleTableBody not found!"); return; }
-             subtitleTableBody.innerHTML = ''; // Clear previous entries
-             if (!segments || segments.length === 0) {
-                console.log("populateEditTable: No segments to display.");
-                // Optionally display a message in the table
-                const row = subtitleTableBody.insertRow();
-                const cell = row.insertCell();
-                cell.colSpan = 2;
-                cell.textContent = "No subtitles generated.";
-                cell.style.textAlign = "center";
-                cell.style.fontStyle = "italic";
-                return;
-             }
-             segments.forEach((segment, index) => {
-                const row = subtitleTableBody.insertRow();
-                row.setAttribute('data-index', index);
+          const timeCell = row.insertCell();
+          timeCell.textContent = `${formatTimeDisplay(
+            segment.start
+          )} --> ${formatTimeDisplay(segment.end)}`;
 
-                const timeCell = row.insertCell();
-                timeCell.textContent = `${formatTimeDisplay(segment.start)} --> ${formatTimeDisplay(segment.end)}`;
-
-                const textCell = row.insertCell();
-                const textArea = document.createElement('textarea');
-                textArea.value = segment.text;
-                // Store times with textarea for easy retrieval
-                textArea.setAttribute('data-segment-start', segment.start);
-                textArea.setAttribute('data-segment-end', segment.end);
-                textCell.appendChild(textArea);
-            });
-            console.log(`Populated table with ${segments.length} segments.`);
-        }
-
-        async function handleFinalizeSubmit(event) {
-            event.preventDefault();
-            console.log("handleFinalizeSubmit started");
-            if (!tempVideoPath) {
-                 statusDiv.innerHTML = "<strong>Error:</strong> No video has been transcribed yet. Please transcribe first.";
-                 return;
-            }
-
-            statusDiv.textContent = 'Generating styled video...';
-            showProcessing('Generating Video...');
-
-            const editedSegments = [];
-            if (subtitleTableBody) {
-                 subtitleTableBody.querySelectorAll('textarea').forEach(ta => {
-                    const start = parseFloat(ta.getAttribute('data-segment-start'));
-                    const end = parseFloat(ta.getAttribute('data-segment-end'));
-                    const text = ta.value;
-                    // Basic validation before adding
-                    if (!isNaN(start) && !isNaN(end)) {
-                         editedSegments.push({ start: start, end: end, text: text });
-                    } else {
-                         console.warn("Skipping segment due to invalid time data:", ta);
-                    }
-                });
-                 console.log(`Collected ${editedSegments.length} segments from table.`);
-            } else {
-                 console.error("Finalize Submit: subtitleTableBody not found!");
-                 statusDiv.textContent = 'Error: Cannot find subtitle data.';
-                 hideProcessing();
-                 return;
-            }
-
-            // Collect styling data safely with defaults
-            const finalizeData = {
-                temp_video_path: tempVideoPath,
-                segments: editedSegments,
-                output_suffix: outputSuffix,
-                font_size: parseInt(document.getElementById('font_size')?.value, 10) || 36,
-                font_name: document.getElementById('font_name')?.value || 'Arial',
-                font_color: document.getElementById('font_color')?.value || '#FFFFFF',
-                outline_color: document.getElementById('outline_color')?.value || '#000000',
-                outline_width: parseInt(document.getElementById('outline_width')?.value, 10) || 2,
-                shadow_offset: parseInt(document.getElementById('shadow_offset')?.value, 10) || 1,
-                position: parseInt(document.getElementById('position')?.value, 10) || 2
-                // x_offset and y_offset are no longer sent
-            };
-            console.log("Finalize data:", finalizeData);
-
-
-            try {
-                 const response = await fetch('/finalize_video/', {
-                     method: 'POST',
-                     headers: { 'Content-Type': 'application/json' },
-                     body: JSON.stringify(finalizeData),
-                 });
-                 const result = await response.json();
-                 if (!response.ok) throw new Error(result?.detail || `HTTP ${response.status}`);
-                 if (!result || !result.video_url) throw new Error("Server response missing final video URL.");
-
-                 statusDiv.textContent = 'Video Generation Complete! Adjust styles and click "Generate Video" again if needed.';
-                 if(videoPlayer) {
-                      videoPlayer.src = result.video_url;
-                      videoPlayer.load(); // Ensure the new source is loaded
-                      console.log("Updated video player source:", result.video_url);
-                 } else { console.error("Video player element not found"); }
-
-                 // Show the result container
-                 if(resultContainer) resultContainer.style.display = 'block';
-                 else { console.error("Result container element not found"); }
-
-             } catch (error) {
-                 console.error('Finalization Error:', error);
-                 statusDiv.innerHTML = `<strong>Finalization Error:</strong><br><pre>${error.message}</pre>`;
-                 // Keep edit step visible on error
-             } finally {
-                 hideProcessing(); // Re-enables finalize button
-             }
-        }
-
-        // --- Reset Function ---
-        function resetApp() {
-             console.log("resetApp called");
-             // This function resets everything to the initial state,
-             // abandoning the current temp video. Backend cleans on next /transcribe.
-             tempVideoPath = '';
-             currentSegments = [];
-             outputSuffix = '.mp4';
-
-             if(statusDiv) statusDiv.textContent = 'Select a video file and click Transcribe.';
-             if(videoPlayer) videoPlayer.src = ''; // Clear player
-
-             if(transcribeStepDiv) transcribeStepDiv.style.display = 'block';      // Show step 1
-             if(editAndResultStepDiv) editAndResultStepDiv.style.display = 'none'; // Hide step 2/result area
-
-             if(transcribeForm) transcribeForm.reset(); // Reset transcribe form
-             resetEditArea(); // Clears table, resets styles form
-
-             // Ensure correct buttons are enabled/disabled for the initial state
-             if (transcribeButton) transcribeButton.disabled = false;
-             if (finalizeButton) finalizeButton.disabled = true;
-             console.log("App Reset to initial state.");
-        }
-
-         // --- Initial Setup (DOMContentLoaded) ---
-        document.addEventListener('DOMContentLoaded', (event) => {
-            console.log("DOM fully loaded - Initializing elements...");
-
-            // Assign variables AFTER DOM is loaded
-            transcribeForm = document.getElementById('transcribeForm');
-            finalizeForm = document.getElementById('finalizeForm');
-            statusDiv = document.getElementById('status');
-            videoPlayer = document.getElementById('processedVideo');
-            subtitleTableBody = document.getElementById('subtitleTable')?.querySelector('tbody');
-            processingOverlay = document.getElementById('processingOverlay');
-            transcribeStepDiv = document.getElementById('transcribeStep');
-            editAndResultStepDiv = document.getElementById('editAndResultStep'); // Combined Div
-            resultContainer = document.getElementById('resultContainer'); // Result Div inside combined
-            transcribeButton = document.getElementById('transcribeButton');
-            finalizeButton = document.getElementById('finalizeButton');
-
-            // Attach Event Listeners
-            if (transcribeForm) {
-                transcribeForm.addEventListener('submit', handleTranscribeSubmit);
-            } else { console.error("Could not find transcribeForm to attach listener."); }
-
-            if (finalizeForm) {
-                 finalizeForm.addEventListener('submit', handleFinalizeSubmit);
-            } else { console.error("Could not find finalizeForm to attach listener."); }
-
-            // Set initial UI state
-            resetApp(); // Sets initial visibility and button states
-            hideProcessing(); // Hide overlay initially
-            console.log("Initialization complete.");
+          const textCell = row.insertCell();
+          const textArea = document.createElement("textarea");
+          textArea.value = segment.text;
+          // Store times with textarea for easy retrieval
+          textArea.setAttribute("data-segment-start", segment.start);
+          textArea.setAttribute("data-segment-end", segment.end);
+          textCell.appendChild(textArea);
         });
+        console.log(`Populated table with ${segments.length} segments.`);
+      }
 
+      async function handleFinalizeSubmit(event) {
+        event.preventDefault();
+        console.log("handleFinalizeSubmit started");
+        if (!tempVideoPath) {
+          statusDiv.innerHTML =
+            "<strong>Error:</strong> No video has been transcribed yet. Please transcribe first.";
+          return;
+        }
+
+        statusDiv.textContent = "Generating styled video...";
+        showProcessing("Generating Video...");
+
+        const editedSegments = [];
+        if (subtitleTableBody) {
+          subtitleTableBody.querySelectorAll("textarea").forEach((ta) => {
+            const start = parseFloat(ta.getAttribute("data-segment-start"));
+            const end = parseFloat(ta.getAttribute("data-segment-end"));
+            const text = ta.value;
+            // Basic validation before adding
+            if (!isNaN(start) && !isNaN(end)) {
+              editedSegments.push({ start: start, end: end, text: text });
+            } else {
+              console.warn("Skipping segment due to invalid time data:", ta);
+            }
+          });
+          console.log(
+            `Collected ${editedSegments.length} segments from table.`
+          );
+        } else {
+          console.error("Finalize Submit: subtitleTableBody not found!");
+          statusDiv.textContent = "Error: Cannot find subtitle data.";
+          hideProcessing();
+          return;
+        }
+
+        // Collect styling data safely with defaults
+        const finalizeData = {
+          temp_video_path: tempVideoPath,
+          segments: editedSegments,
+          output_suffix: outputSuffix,
+          font_size:
+            parseInt(document.getElementById("font_size")?.value, 10) || 36,
+          font_name: document.getElementById("font_name")?.value || "Arial",
+          font_color: document.getElementById("font_color")?.value || "#FFFFFF",
+          outline_color:
+            document.getElementById("outline_color")?.value || "#000000",
+          outline_width:
+            parseInt(document.getElementById("outline_width")?.value, 10) || 2,
+          shadow_offset:
+            parseInt(document.getElementById("shadow_offset")?.value, 10) || 1,
+          position:
+            parseInt(document.getElementById("position")?.value, 10) || 2,
+          // x_offset and y_offset are no longer sent
+        };
+        console.log("Finalize data:", finalizeData);
+
+        try {
+          const response = await fetch("/finalize_video/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(finalizeData),
+          });
+          const result = await response.json();
+          if (!response.ok)
+            throw new Error(result?.detail || `HTTP ${response.status}`);
+          if (!result || !result.video_url)
+            throw new Error("Server response missing final video URL.");
+
+          statusDiv.textContent =
+            'Video Generation Complete! Adjust styles and click "Generate Video" again if needed.';
+          if (videoPlayer) {
+            videoPlayer.src = result.video_url;
+            videoPlayer.load(); // Ensure the new source is loaded
+            console.log("Updated video player source:", result.video_url);
+          } else {
+            console.error("Video player element not found");
+          }
+
+          // Show the result container
+          if (resultContainer) resultContainer.style.display = "block";
+          else {
+            console.error("Result container element not found");
+          }
+        } catch (error) {
+          console.error("Finalization Error:", error);
+          statusDiv.innerHTML = `<strong>Finalization Error:</strong><br><pre>${error.message}</pre>`;
+          // Keep edit step visible on error
+        } finally {
+          hideProcessing(); // Re-enables finalize button
+        }
+      }
+
+      // --- Reset Function ---
+      function resetApp() {
+        console.log("resetApp called");
+        // This function resets everything to the initial state,
+        // abandoning the current temp video. Backend cleans on next /transcribe.
+        tempVideoPath = "";
+        currentSegments = [];
+        outputSuffix = ".mp4";
+
+        if (statusDiv)
+          statusDiv.textContent = "Select a video file and click Transcribe.";
+        if (videoPlayer) videoPlayer.src = ""; // Clear player
+
+        if (transcribeStepDiv) transcribeStepDiv.style.display = "block"; // Show step 1
+        if (editAndResultStepDiv) editAndResultStepDiv.style.display = "none"; // Hide step 2/result area
+
+        if (transcribeForm) transcribeForm.reset(); // Reset transcribe form
+        resetEditArea(); // Clears table, resets styles form
+
+        // Ensure correct buttons are enabled/disabled for the initial state
+        if (transcribeButton) transcribeButton.disabled = false;
+        if (finalizeButton) finalizeButton.disabled = true;
+        console.log("App Reset to initial state.");
+      }
+      // --- NEW Function: handlePreloadVideoFromUrl ---
+      async function handlePreloadVideoFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const videoUrlToLoad = urlParams.get("video_url");
+        let videoName = urlParams.get("video_name"); // Get provided name
+
+        if (!videoUrlToLoad) {
+          return; // No video_url parameter, do nothing
+        }
+
+        // Determine a good filename
+        if (!videoName || videoName.trim() === "") {
+          // If video_name is missing or empty
+          try {
+            const urlPath = new URL(videoUrlToLoad).pathname;
+            const lastSegment = urlPath.substring(urlPath.lastIndexOf("/") + 1);
+            if (lastSegment && decodeURIComponent(lastSegment).includes(".")) {
+              videoName = decodeURIComponent(lastSegment);
+            } else {
+              videoName = "preloaded_video.mp4";
+            }
+          } catch (e) {
+            console.warn(
+              "Could not parse video_url for filename, using default:",
+              e
+            );
+            videoName = "preloaded_video.mp4";
+          }
+        }
+
+        // Ensure filename has an extension
+        if (!videoName.includes(".")) {
+          // Try to get extension from URL if videoName is simple
+          const suffixMatch = videoUrlToLoad.match(/\.([^./?]+)(?:[?#]|$)/);
+          const extension = suffixMatch ? `.${suffixMatch[1]}` : ".mp4";
+          videoName += extension;
+        }
+
+        console.log(
+          `Pre-loading video from URL: ${videoUrlToLoad} as ${videoName}`
+        );
+        if (statusDiv)
+          statusDiv.textContent = `Loading video: ${videoName}... Please wait.`;
+        showProcessing(`Loading ${videoName}...`);
+
+        const videoFileInput = document.getElementById("video_file");
+        if (!videoFileInput) {
+          console.error(
+            "Video file input element 'video_file' not found for pre-loading."
+          );
+          if (statusDiv)
+            statusDiv.innerHTML =
+              "<strong>Error:</strong> Cannot find video input element on the page.";
+          hideProcessing();
+          return;
+        }
+
+        try {
+          // Fetch the video content as a blob
+          const response = await fetch(videoUrlToLoad, { mode: "cors" }); // Ensure CORS mode
+          if (!response.ok) {
+            throw new Error(
+              `Failed to fetch video: ${response.status} ${response.statusText}. Check server CORS configuration if the source is different.`
+            );
+          }
+          const videoBlob = await response.blob();
+
+          // Create a File object
+          const file = new File([videoBlob], videoName, {
+            type: videoBlob.type || "video/mp4",
+          });
+
+          // Create a DataTransfer object and add the file
+          const dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+
+          // Set the files property of the input
+          videoFileInput.files = dataTransfer.files;
+          console.log(`Video "${videoName}" pre-loaded into file input.`);
+          if (statusDiv)
+            statusDiv.textContent = `Video "${videoName}" loaded. You can now adjust Whisper model settings and click "Transcribe Video".`;
+
+          // Highlight the transcribe button or provide some visual cue
+          if (transcribeButton) {
+            transcribeButton.focus(); // Focus the button
+            // You could add a temporary class for highlighting
+          }
+        } catch (error) {
+          console.error("Error pre-loading video:", error);
+          if (statusDiv)
+            statusDiv.innerHTML = `<strong>Error loading video:</strong><br><pre>${error.message}</pre>`;
+        } finally {
+          hideProcessing(); // This will re-enable the transcribeButton
+        }
+      }
+      // --- Initial Setup (DOMContentLoaded) ---
+      document.addEventListener("DOMContentLoaded", (event) => {
+        console.log("DOM fully loaded - Initializing elements...");
+
+        // Assign variables AFTER DOM is loaded
+        transcribeForm = document.getElementById("transcribeForm");
+        finalizeForm = document.getElementById("finalizeForm");
+        statusDiv = document.getElementById("status");
+        videoPlayer = document.getElementById("processedVideo");
+        subtitleTableBody = document
+          .getElementById("subtitleTable")
+          ?.querySelector("tbody");
+        processingOverlay = document.getElementById("processingOverlay");
+        transcribeStepDiv = document.getElementById("transcribeStep");
+        editAndResultStepDiv = document.getElementById("editAndResultStep");
+        resultContainer = document.getElementById("resultContainer");
+        transcribeButton = document.getElementById("transcribeButton");
+        finalizeButton = document.getElementById("finalizeButton");
+
+        // Attach Event Listeners
+        if (transcribeForm) {
+          transcribeForm.addEventListener("submit", handleTranscribeSubmit);
+        } else {
+          console.error("Could not find transcribeForm to attach listener.");
+        }
+
+        if (finalizeForm) {
+          finalizeForm.addEventListener("submit", handleFinalizeSubmit);
+        } else {
+          console.error("Could not find finalizeForm to attach listener.");
+        }
+
+        // Set initial UI state
+        resetApp();
+        hideProcessing();
+        console.log("Initialization complete.");
+
+        // --- NEW: Call the pre-load handler ---
+        handlePreloadVideoFromUrl();
+        // --- END NEW ---
+      });
     </script>
-</body>
+  </body>
 </html>
